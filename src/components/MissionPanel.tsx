@@ -1,121 +1,125 @@
 import { useState } from 'react';
-import { Check, ChevronDown, RotateCcw, X } from 'lucide-react';
-import { DEFAULT_MISSION, type Candidate, type Mission } from '../core/contracts';
-import { candidateLabel, dollars, latencyValue, missionDisplay } from '../core/display';
-import { GATES, type evaluateEnvelope, type Violation } from '../core/envelope';
+import { Check, RotateCcw, X } from 'lucide-react';
+import type { Candidate, Mission } from '../core/contracts';
+import { candidateLabel, dollars, latencyValue, percent } from '../core/display';
+import { DEPLOYMENT_MISSION, GATES, type Violation, type evaluateEnvelope } from '../core/envelope';
 import { compileMission, type Proposal } from '../core/mission';
 import { NumberField } from './NumberField';
 
 type Props = {
-  mission: Mission; setMission: (next: Mission) => void;
-  envelope: ReturnType<typeof evaluateEnvelope>; total: number; selected: Candidate | null;
-  recommended: Candidate | undefined; select: (id: string) => void;
+  mission: Mission; setMission: (mission: Mission) => void; envelope: ReturnType<typeof evaluateEnvelope>;
+  total: number; selected: Candidate | null; select: (id: string) => void;
 };
-const example = 'Keep recall at least 90%, but prioritize latency under 50 ms.';
+const example = 'Catch at least 95% of fraud, keep expected precision above 80%, and respond within 100 milliseconds.';
 
-function failure(gate: Violation) {
-  if (gate.observed === null) return 'Metric unavailable';
-  if (gate.margin === null) return '';
-  const gap = -gate.margin * (gate.direction === 1 ? 100 : 1);
-  const size = gap < 0.01 ? gap.toPrecision(2) : gap.toFixed(2).replace(/\.?0+$/, '');
-  return size + (gate.direction === 1 ? ' pp below minimum' : ' ' + gate.unit + ' over maximum');
+export function gateValue(key: keyof Mission, value: number | null | undefined) {
+  if (value === undefined) return 'Off';
+  if (value === null) return 'Unknown';
+  if (['minPrecision', 'minRecall', 'maxFalsePositiveRate', 'targetPrevalence'].includes(key)) return percent(value, 2);
+  if (key === 'maxP95LatencyMs') return latencyValue(value);
+  if (key === 'minThroughputRps') return value.toLocaleString() + ' req/s';
+  return dollars(value);
 }
 
-export function MissionPanel({ mission, setMission, envelope, total, selected, recommended, select }: Props) {
+function failure(gate: Violation) {
+  if (gate.observed === null) return 'Required evidence unavailable';
+  if (gate.precisionRounded) return 'Rounds to 100%. The exact rate is lower.';
+  const gap = Math.abs(gate.margin!) * (gate.unit === '%' ? 100 : 1);
+  return (gap < 0.01 ? gap.toPrecision(2) : Number(gap.toFixed(2))) + ' ' +
+    (gate.unit === '%' ? 'pp' : gate.unit) + (gate.direction === 1 ? ' below minimum' : ' over maximum');
+}
+
+export function MissionBrief() {
+  return <section className="mission-brief" aria-labelledby="mission-title">
+    <div className="eyebrow">MISSION 001 / FRAUD DETECTION</div>
+    <h2 id="mission-title">The fraud deployment challenge</h2>
+    <p>A bank processes one million transactions a day. Catch at least 95% of fraud, reduce false alarms, and stay within the latency and inference budgets.</p>
+  </section>;
+}
+
+export function MissionPanel({ mission, setMission, envelope, total, selected, select }: Props) {
+  const checks = selected ? envelope.checks.get(selected.id) ?? [] : [];
+  const count = envelope.feasibleIds.size;
+  const passed = Boolean(selected && envelope.feasibleIds.has(selected.id));
+  const closest = envelope.alternatives[0];
   const [text, setText] = useState('');
   const [pending, setPending] = useState(false);
-  const [response, setResponse] = useState<{ proposal?: Proposal; error?: string; base: Mission; text: string } | null>(null);
-  const current = response?.base === mission && response?.text === text ? response : null;
+  const [response, setResponse] = useState<{ base: Mission; text: string; proposal?: Proposal; error?: string }>();
+  const current = response?.base === mission && response.text === text ? response : undefined;
   const proposal = current?.proposal;
-  const count = envelope.feasibleIds.size;
-  const checks = selected ? envelope.checks.get(selected.id) : undefined;
-  const failures = checks?.filter(gate => !gate.passes) ?? [];
-  const firstAlternative = envelope.alternatives[0];
 
   async function preview() {
     setPending(true);
-    setResponse(null);
+    setResponse(undefined);
     try {
-      setResponse({ proposal: await compileMission(text, mission), base: mission, text });
+      setResponse({ base: mission, text, proposal: await compileMission(text, mission) });
     } catch (problem) {
-      setResponse({ error: problem instanceof Error ? problem.message : 'Unable to parse this mission.', base: mission, text });
+      setResponse({ base: mission, text, error: problem instanceof Error ? problem.message : 'Unable to parse this mission.' });
     } finally {
       setPending(false);
     }
   }
 
-  return <aside className="mission-panel" id="mission" tabIndex={-1} aria-labelledby="mission-title">
-    <div className="mission-heading">
-      <h2 id="mission-title">Mission limits</h2>
-      <button className="icon-button" aria-label="Restore default mission" title="Restore default mission"
-        onClick={() => { setMission({ ...DEFAULT_MISSION }); setResponse(null); }}><RotateCcw size={17} /></button>
-    </div>
-    <div className={'mission-status' + (failures.length ? ' danger' : '')} aria-live="polite">
-      <strong>{selected ? failures.length ? failures.length + ' of 4 limits missed' : 'Selected point meets all 4 limits' : 'Select a point to check its limits'}</strong>
-      <span>{count ? count + ' feasible configuration' + (count === 1 ? '' : 's') : 'No feasible configuration'}</span>
-      <small>Across {total} evaluated points</small>
-    </div>
-    <div className="limit-head"><span>Selected point</span><span>Edit limit</span></div>
-    <div className="limit-list">
-      {GATES.map(gate => {
-        const ratio = gate.direction === 1;
-        const check = checks?.find(item => item.key === gate.key);
-        const observed = check?.observed ?? null;
-        return <div className={'limit-row' + (check && !check.passes ? ' limit-missed' : '')} key={gate.key} data-testid={gate.metric}>
-          <div>
-            <span className="limit-label">{gate.label}</span>
-            <strong>{gate.key === 'maxCostPer1kUsd' ? dollars(observed) : gate.key === 'maxP95LatencyMs' ? latencyValue(observed)
-              : observed === null ? 'Unknown' : missionDisplay(gate.key, observed)}</strong>
-            {check && <small className={check.passes ? 'pass' : 'fail'}>
-              {check.passes ? <Check size={13} /> : <X size={13} />}
-              {check.passes ? 'Meets limit' : failure(check)}
-            </small>}
-          </div>
-          <div className="limit-control">
-            <span aria-hidden="true">{ratio ? '≥' : '≤'}</span>
-            <NumberField compact label={(ratio ? 'Min ' : 'Max ') + gate.label.toLowerCase()} unit={gate.unit}
-              min={0} exclusiveMin={gate.key === 'maxP95LatencyMs'} max={ratio ? 100 : 1_000_000} step={ratio ? 0.1 : 'any'}
-              value={ratio ? Number((mission[gate.key] * 100).toPrecision(15)) : mission[gate.key]}
-              onChange={value => {
-                const next = ratio ? value / 100 : value;
-                if (mission[gate.key] !== next) setMission({ ...mission, [gate.key]: next });
-              }} />
-          </div>
-        </div>;
-      })}
-    </div>
-    <div className="preset-row">
-      <button className="outline-button" aria-pressed={mission.maxP95LatencyMs === 50}
-        onClick={() => setMission({ ...mission, maxP95LatencyMs: 50 })}>Tighten to 50 ms</button>
-      <button className="text-button" onClick={() => setMission({ minPrecision: 1, minRecall: 1, maxP95LatencyMs: 20, maxCostPer1kUsd: 1 })}>Impossible preset</button>
-    </div>
-    {failures.length > 0 && recommended &&
-      <button className="text-button alternative-link" onClick={() => select(recommended.id)}>Try {candidateLabel(recommended)} · meets all limits</button>}
-    {!count && firstAlternative && <div className="nearby">
-      <strong>Closest evaluated point</strong>
-      <button className="text-button" onClick={() => select(firstAlternative.candidate.id)}>{candidateLabel(firstAlternative.candidate)}</button>
-      <span>{firstAlternative.failures.map(gate => gate.label + ' would need ' + missionDisplay(gate.key, gate.observed!)).join(' · ')}</span>
-    </div>}
-    <details className="compiler">
-      <summary>Mission Compiler <ChevronDown size={16} /></summary>
-      <form onSubmit={event => { event.preventDefault(); void preview(); }}>
-        <label htmlFor="mission-text">Describe the limits</label>
-        <textarea id="mission-text" aria-label="Mission instruction" rows={3} maxLength={1000} value={text}
-          placeholder="Recall at least 90%; latency under 50 ms."
-          onChange={event => setText(event.target.value)} />
-        <div className="compiler-actions">
-          <button className="outline-button" disabled={pending || !text.trim()}>{pending ? 'Parsing…' : 'Preview changes'}</button>
-          <button type="button" className="text-button" onClick={() => setText(example)}>Use example</button>
+  function field(gate: typeof GATES[number]) {
+    const value = mission[gate.key], check = checks.find(c => c.key === gate.key);
+    const ratio = gate.unit === '%';
+    const label = gate.key === 'minPrecision' ? 'Expected precision' : gate.label;
+    const inputMax = ratio ? 100 : gate.key === 'minThroughputRps' ? 1e9 : gate.key === 'maxDailyCostUsd' ? 1e12 : 1e6;
+    return <div key={gate.key} className="limit-block">
+      <div className="limit-row">
+        <div><span>{label}</span><strong className={check && !check.passes ? 'failed-value' : undefined}>{gateValue(gate.key, check?.observed ?? null)}</strong></div>
+        <div className="limit-control"><span aria-hidden="true">{gate.direction === 1 ? '≥' : '≤'}</span>
+          {value === undefined
+            ? <button className="button quiet" onClick={() => setMission({ ...mission, [gate.key]: gate.key === 'minThroughputRps' ? 1 : DEPLOYMENT_MISSION[gate.key] })}>Require {label.toLowerCase()}</button>
+            : <NumberField compact label={(gate.direction === 1 ? 'Min ' : 'Max ') + label.toLowerCase()}
+              value={ratio ? Number((value * 100).toPrecision(12)) : value} min={0} max={inputMax}
+              exclusiveMin={gate.key === 'maxP95LatencyMs'} step={ratio ? 0.1 : 'any'} unit={gate.unit}
+              onChange={next => setMission({ ...mission, [gate.key]: ratio ? next / 100 : next })} />}
         </div>
-      </form>
-      {current?.error && <p className="field-error" role="alert">{current.error}</p>}
-      {proposal && <div className="compiler-diff" aria-live="polite">
-        <strong>{proposal.source === 'llm' ? 'Model-assisted proposal' : 'Offline parser proposal'}</strong>
-        {proposal.changes.length ? <ul>{proposal.changes.map(change => <li key={change.key}>{GATES.find(g => g.key === change.key)?.label}: {missionDisplay(change.key, change.from)} → {missionDisplay(change.key, change.to)}</li>)}</ul> : <p>These limits already match your mission.</p>}
-        <p>Proposed limits · {GATES.map(gate => gate.label + ' ' + missionDisplay(gate.key, proposal.mission[gate.key])).join(' · ')}</p>
-        {proposal.warnings.map(warning => <p key={warning}>{warning}</p>)}
-        {proposal.changes.length > 0 && <button className="primary-button" onClick={() => { setMission(proposal.mission); setResponse(null); }}>Apply mission</button>}
+      </div>
+      {check && !check.passes && <p className="gate-fail"><X size={12} />{failure(check)}</p>}
+    </div>;
+  }
+
+  return <aside className="mission-panel" aria-labelledby="constraints-title">
+    <div className="mission-status" aria-live="polite">
+      <div><strong data-testid="feasible-count">{count}<span> / {total}</span></strong><span>Feasible configurations</span></div>
+      <span className={passed ? 'status-pass' : 'status-fail'}>{passed && <Check size={15} />}{selected ? passed ? 'Within limits' : 'Outside limits' : 'No selection'}</span>
+    </div>
+    <div className="limits">
+      <div className="section-line"><h3 id="constraints-title">Mission constraints</h3>
+        <button className="icon-button" aria-label="Restore default mission" title="Restore default mission" onClick={() => setMission({ ...DEPLOYMENT_MISSION })}><RotateCcw size={16} /></button>
+      </div>
+      <div className="limit-head"><span>Selected point</span><span>Required limit</span></div>
+      {GATES.filter(g => !['maxCostPer1kUsd', 'minThroughputRps'].includes(g.key)).map(field)}
+      <details className="rail-details">
+        <summary>Additional constraints</summary>
+        {GATES.filter(g => ['maxCostPer1kUsd', 'minThroughputRps'].includes(g.key)).map(field)}
+        {mission.minThroughputRps !== undefined && <button className="text-link" onClick={() => setMission({ ...mission, minThroughputRps: undefined })}>Remove throughput minimum</button>}
+      </details>
+      {!count && <div className="mission-conflict"><strong>No evaluated point meets every limit.</strong>
+        {envelope.failedCounts[0]?.count > 0 && <p>{envelope.failedCounts[0].label} excludes {envelope.failedCounts[0].count} of {total} points.</p>}
+        {closest && <p><button className="text-link" onClick={() => select(closest.candidate.id)}>Inspect {candidateLabel(closest.candidate)}</button>. Misses {closest.failures.map(c => c.label === 'P95 latency' ? c.label : c.label.toLowerCase()).join(', ')}.</p>}
       </div>}
-    </details>
+      {!passed && envelope.recommendedId && <button className="button recommend" onClick={() => select(envelope.recommendedId!)}>Select a feasible point</button>}
+      <details className="rail-details compiler">
+        <summary>Mission compiler</summary>
+        <form onSubmit={event => { event.preventDefault(); void preview(); }}>
+          <label htmlFor="mission-text">Describe your requirements</label>
+          <textarea id="mission-text" value={text} onChange={event => setText(event.target.value)} maxLength={1000} rows={4} />
+          <div className="compiler-actions">
+            <button className="button" disabled={pending || !text.trim()}>{pending ? 'Parsing…' : 'Preview changes'}</button>
+            <button type="button" className="text-link" onClick={() => setText(example)}>Use example</button>
+          </div>
+        </form>
+        {current?.error && <p className="field-error" role="alert">{current.error}</p>}
+        {proposal && <div className="compiler-preview" aria-live="polite">
+          <strong>{proposal.source === 'llm' ? 'Model-assisted proposal' : 'Offline parser proposal'}</strong>
+          {proposal.changes.length ? <ul>{proposal.changes.map(c => <li key={c.key}>{GATES.find(g => g.key === c.key)?.label ?? 'Target prevalence'} · {gateValue(c.key, c.from)} → {gateValue(c.key, c.to)}</li>)}</ul> : <p>These limits already match your mission.</p>}
+          {proposal.warnings.map(warning => <p key={warning}>{warning}</p>)}
+          {proposal.changes.length > 0 && <button className="button primary" onClick={() => setMission(proposal.mission)}>Apply mission</button>}
+        </div>}
+      </details>
+    </div>
   </aside>;
 }

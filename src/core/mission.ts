@@ -1,18 +1,23 @@
 import { missionPatchSchema, missionSchema, type Mission } from './contracts';
 
 const number = '([0-9]+(?:\\.[0-9]+)?|\\.[0-9]+)';
-const lower = '(?:must\\s+be\\s+|of\\s+)?(?:at\\s+least|>=|≥|no\\s+less\\s+than|minimum(?:\\s+of)?)\\s*';
-const upper = '(?:must\\s+be\\s+|of\\s+)?(?:at\\s+most|<=|≤|<|under|below|no\\s+more\\s+than|maximum(?:\\s+of)?)\\s*';
+const lower = '(?:must\\s+be\\s+|of\\s+)?(?:at\\s+least|>=|≥|>|above|no\\s+less\\s+than|minimum(?:\\s+of)?)\\s*';
+const upper = '(?:must\\s+be\\s+|of\\s+)?(?:within|at\\s+most|<=|≤|<|under|below|no\\s+more\\s+than|maximum(?:\\s+of)?)\\s*';
 const patterns = [
-  ['minPrecision', '\\bprecision\\s*' + lower + number + '\\s*(%|percent\\b)?'],
+  ['minPrecision', '\\b(?:expected\\s+)?precision\\s*' + lower + number + '\\s*(%|percent\\b)?'],
   ['minRecall', '\\brecall\\s*' + lower + number + '\\s*(%|percent\\b)?'],
-  ['maxP95LatencyMs', '\\b(?:p95(?:\\s+latency)?|latency)\\s*' + upper + number + '\\s*(ms|milliseconds?)\\b'],
+  ['minRecall', '\\bcatch\\s+' + lower + number + '\\s*(%|percent\\b)\\s+of\\s+(?:fraudulent transactions|fraud)\\b'],
+  ['maxP95LatencyMs', '\\b(?:p95(?:\\s+latency)?|latency|respond)\\s*' + upper + number + '\\s*(ms|milliseconds?)\\b'],
   ['maxCostPer1kUsd', '\\bcost\\s*' + upper + '\\$?\\s*' + number + '\\s*(?:usd\\s*)?(?:/\\s*|per\\s+)(?:1,?000|1k|thousand)\\b(?:\\s+requests\\b)?'],
+  ['maxDailyCostUsd', '\\b(?:daily\\s+)?(?:budget|cost)\\s*' + upper + '\\$?\\s*' + number + '\\s*(?:usd\\s*)?(?:/\\s*day|per\\s+day|daily)\\b'],
+  ['maxFalsePositiveRate', '\\b(?:false[- ]positive rate|fpr)\\s*' + upper + number + '\\s*(%|percent\\b)?'],
+  ['minThroughputRps', '\\b(?:measured\\s+)?throughput\\s*' + lower + number + '\\s*(?:req(?:uests)?\\s*/\\s*s|requests\\s+per\\s+second)\\b'],
+  ['targetPrevalence', '\\b(?:target\\s+|fraud\\s+)?prevalence\\s*(?:of|=|at|is)?\\s*' + number + '\\s*(%|percent\\b)?'],
 ] as const;
 type Key = keyof Mission;
 export type Proposal = {
   mission: Mission;
-  changes: { key: Key; from: number; to: number }[];
+  changes: { key: Key; from: number | undefined; to: number }[];
   source: 'llm' | 'fallback';
   warnings: string[];
 };
@@ -22,7 +27,7 @@ export function proposePatch(rawPatch: unknown, current: Mission, source: Propos
   if (Object.keys(patch).length === 0) throw new Error('Specify at least one constraint with a number and units.');
   const mission = missionSchema.parse({ ...current, ...patch });
   const changes = (Object.keys(patch) as Key[]).filter(key => mission[key] !== current[key])
-    .map(key => ({ key, from: current[key], to: mission[key] }));
+    .map(key => ({ key, from: current[key], to: mission[key]! }));
   return { mission, changes, source, warnings };
 }
 
@@ -34,22 +39,25 @@ export function parseOffline(text: string, current: Mission): Proposal {
   for (const [key, pattern] of patterns) {
     const matches = [...rest.matchAll(new RegExp(pattern, 'g'))];
     if (!matches.length) continue;
-    if (matches.length > 1) throw new Error('Specify a single limit for each metric.');
+    if (matches.length > 1 || patch[key] !== undefined) throw new Error('Specify a single limit for each metric.');
     const [matched, numeric, unit] = matches[0];
-    const quality = key === 'minPrecision' || key === 'minRecall';
+    const quality = key === 'minPrecision' || key === 'minRecall' || key === 'maxFalsePositiveRate' || key === 'targetPrevalence';
     if (quality && !unit && Number(numeric) > 1) throw new Error('Add % or percent to whole-number quality limits.');
     patch[key] = quality && unit ? Number(numeric) / 100 : Number(numeric);
-    usedStrict ||= /\b(?:under|below)\b|<(?![=])/.test(matched);
+    usedStrict ||= /\b(?:under|below|above)\b|[<>](?![=])/.test(matched);
     rest = rest.replace(matched, ' ');
   }
   const residue = rest
     .replace(/\b(?:keep (?:all |the )?other constraints|leave (?:all |the )?other constraints (?:as is|unchanged)|please|keep|and|but|prioriti[sz]e|make|set|with|require)\b/g, '')
     .replace(/[\s,.;]/g, '');
   if (residue || !Object.keys(patch).length) {
-    throw new Error('Use explicit limits such as “recall at least 90%” or “latency under 50 ms”. Check units and unsupported phrases.');
+    throw new Error('Give one number and unit per limit. Unrecognized requirement: ' + (rest.trim() || text) +
+      ' Supported limits are precision, recall, false-positive rate, prevalence, P95 latency, USD per day or per 1,000 requests, and measured throughput.');
   }
   if (!missionPatchSchema.safeParse(patch).success) throw new Error('A limit is outside the supported numeric range.');
-  return proposePatch(patch, current, 'fallback', usedStrict ? ['Mission limits are inclusive. Check the proposed maximum before applying.'] : []);
+  const warnings = usedStrict ? ['Mission limits are inclusive. Confirm that including the stated boundary is acceptable.'] : [];
+  if (/\brespond\b/.test(text.toLowerCase())) warnings.push('The response-time requirement was interpreted as P95 latency. Confirm this before applying.');
+  return proposePatch(patch, current, 'fallback', warnings);
 }
 
 export async function compileMission(text: string, current: Mission): Promise<Proposal> {
@@ -66,6 +74,10 @@ export async function compileMission(text: string, current: Mission): Promise<Pr
     }
   } catch {
     // Static hosting, offline browsers and provider errors all use the local grammar.
+  }
+  if (response?.status === 422) {
+    const result = await response.json();
+    throw new Error(result.error);
   }
   const proposal = parseOffline(text, current);
   if (response?.status === 502) proposal.warnings.push('The model provider was unavailable. The offline parser processed this proposal.');

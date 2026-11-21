@@ -1,66 +1,78 @@
-import { useState } from 'react';
-import { Check, X } from 'lucide-react';
-import { type Candidate, type Manifest } from '../core/contracts';
-import { dominates, type evaluateEnvelope } from '../core/envelope';
-import { candidateLabel, dollars, latencyValue, marginText, missionDisplay, percent } from '../core/display';
-import { instrumentReading } from '../core/instruments';
+import type { Candidate, Manifest, Mission } from '../core/contracts';
+import { deploymentReadings, RATE_STABILITY, STEADY_STATE } from '../core/deployment';
+import { candidateLabel, percent } from '../core/display';
+import type { evaluateEnvelope } from '../core/envelope';
+import type { Alignment } from '../core/geometry';
 import { Drawer } from './Drawer';
+import { gateValue } from './MissionPanel';
 
-type Props = { candidate: Candidate; manifest: Manifest; envelope: ReturnType<typeof evaluateEnvelope>; close: () => void };
-export function Evidence({ candidate, manifest, envelope, close }: Props) {
-  const [comparisonId, setComparisonId] = useState('');
-  const { tp, fp, tn, fn } = candidate;
-  const checks = envelope.checks.get(candidate.id) ?? [];
-  const other = manifest.candidates.find(point => point.id === comparisonId);
-  const dominator = manifest.candidates.find(point => dominates(point, candidate));
-  const complete = checks.every(gate => gate.observed !== null);
-  const f1 = instrumentReading('f1', candidate.precision, candidate.recall, false).value;
-  const formatInterval = (interval: [number, number] | null) => interval ? interval.map(v => percent(v)).join('–') : 'Unknown';
+const exact = (value: number | null) => value === null ? 'Unknown' : Number(value.toPrecision(12)).toString();
+type Proof = {
+  state: string; value: number | null; alignment: Alignment | null;
+  verification: { passes: boolean; referenceValue: number | null; absoluteError: number | null;
+    error: number | null; tolerance: number; criterion: string; residual: number | null } | null;
+};
 
-  return <Drawer titleId="evidence-title" label="Evidence" close={close}>
-      <h2 id="evidence-title">{candidateLabel(candidate)}</h2>
-      <p className="mono drawer-meta">{candidate.id} · {candidate.modelVersion} · {candidate.inferenceProfile}</p>
-      <label className="compare-control">Compare with<select aria-label="Compare with" value={comparisonId} onChange={event => setComparisonId(event.target.value)}>
-        <option value="">Choose a candidate</option>
-        {manifest.candidates.filter(point => point.id !== candidate.id).map(point => <option key={point.id} value={point.id}>{candidateLabel(point)}</option>)}
-      </select></label>
-      <h3>Mission gates</h3>
-      <ul className="checks">
-        {checks.map(gate => <li key={gate.key}>
-          <span className={gate.passes ? 'pass' : 'fail'}>{gate.passes ? <Check size={15} /> : <X size={15} />}{gate.passes ? 'Pass' : 'Fail'}</span>
-          <div><strong>{gate.label}</strong><small>{gate.observed === null ? 'Unknown' : missionDisplay(gate.key, gate.observed)} · {gate.direction === 1 ? 'min' : 'max'} {missionDisplay(gate.key, gate.limit)}</small></div>
-          <code title={String(gate.margin)}>{marginText(gate, true)}</code>
-        </li>)}
-      </ul>
-      <p className="drawer-meta">Positive margins clear the gate. Precision and recall use percentage points.</p>
-      <h3>Classification evidence</h3>
-      <div className="confusion">{Object.entries({ TP: tp, FP: fp, TN: tn, FN: fn }).map(([label, value]) =>
-        <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div>
-      <p>{candidate.sampleCount.toLocaleString()} labeled records · FPR {percent(candidate.falsePositiveRate)} · Geometric F1 {percent(f1, 2)}</p>
-      <p>{manifest.intervalMethod}. Precision {formatInterval(candidate.precisionInterval)} (n={tp + fp}). Recall {formatInterval(candidate.recallInterval)} (n={tp + fn}).</p>
-      <h3>Pareto standing</h3>
-      <p>{!complete ? 'Incomplete measurements exclude this point from the frontiers.' :
-        dominator ? candidateLabel(dominator) + ' is at least as good on all four objectives and better on at least one.' : 'On the global Pareto frontier.'}
-        {envelope.feasibleParetoIds.has(candidate.id) && ' On the feasible Pareto frontier.'}</p>
-      {other && <><p>{dominates(candidate, other) ? 'Selected point dominates the comparison.' :
-        dominates(other, candidate) ? 'Comparison dominates the selected point.' : 'Neither point dominates the other.'}</p>
-        <table className="compare-table"><thead><tr><th>Metric</th><th>Selected</th><th>Comparison</th><th>Delta</th></tr></thead>
-          <tbody>{checks.map(gate => {
-            const baseline = other[gate.metric];
-            const show = gate.metric === 'costPer1kUsd' ? dollars : gate.metric === 'p95LatencyMs' ? latencyValue : percent;
-            const delta = gate.observed === null || baseline === null ? null : gate.observed - baseline;
-            return <tr key={gate.key}><th>{gate.label}</th><td>{show(gate.observed)}</td><td>{show(baseline)}</td>
-              <td>{delta === null ? 'Unknown' : marginText({ ...gate, margin: delta })}</td></tr>;
-          })}</tbody></table></>}
-      <h3>Provenance</h3>
+export function CalculationProof({ title, formula, reading }: { title: string; formula: string; reading: Proof }) {
+  const proof = reading.verification;
+  return <section className="proof-section">
+    <h3>{title}</h3><p className="equation">{formula}</p>
+    <dl className="provenance">
+      <dt>{reading.alignment ? 'Geometric reading' : 'Reading'}</dt><dd>{exact(reading.value)} {reading.state === 'boundary' || reading.state === 'zero' ? '· exact boundary' : ''}</dd>
+      {reading.alignment && <>
+        <dt>Outer coordinates</dt><dd>({reading.alignment.left.x}, {exact(reading.alignment.left.y)}) · ({reading.alignment.right.x}, {exact(reading.alignment.right.y)})</dd>
+        <dt>Center crossing</dt><dd>({reading.alignment.intersection.x}, {exact(reading.alignment.intersection.y)})</dd>
+      </>}
+      {proof && <>
+        <dt>Independent reference</dt><dd>{exact(proof.referenceValue)}</dd>
+        <dt>Absolute error</dt><dd>{proof.absoluteError?.toExponential(3) ?? 'Unavailable'}</dd>
+        {proof.criterion === 'relative' && <><dt>Relative error</dt><dd>{proof.error?.toExponential(3) ?? 'Unavailable'}</dd></>}
+        <dt>Collinearity residual</dt><dd>{proof.residual?.toExponential(3) ?? 'Outside finite scale'}{proof.residual !== null && ' SVG units'}</dd>
+        <dt>Numerical check</dt><dd>{proof.passes ? 'Within tolerance' : 'Outside tolerance'} · {proof.criterion} {proof.tolerance.toExponential()}</dd>
+      </>}
+      {reading.state === 'missing' && <><dt>Status</dt><dd>Required inputs unavailable</dd></>}
+      {reading.state === 'no-alerts' && <><dt>Status</dt><dd>Undefined because expected alerts are zero</dd></>}
+    </dl>
+  </section>;
+}
+
+export function Evidence({ candidate, manifest, mission, requests, envelope, close }: {
+  candidate: Candidate; manifest: Manifest; mission: Mission; requests: number; envelope: ReturnType<typeof evaluateEnvelope>; close: () => void;
+}) {
+  const prior = mission.targetPrevalence ?? 0.1;
+  const results = deploymentReadings(candidate, prior, requests);
+  return <Drawer titleId="evidence-title" label="Decision evidence" close={close}>
+    <h2 id="evidence-title">{candidateLabel(candidate)}</h2>
+    <p>Evaluated scores supply the conditional rates. Deployment prevalence and daily volume supply the scenario. Each inverse scale reads the straightedge crossing, then independent arithmetic checks the result.</p>
+    <div className="evidence-flow">TPR + FPR + prevalence → expected precision → expected F1<br />Daily volume + unit price → daily cost → budget gate</div>
+    <p>The middle axis averages the two outer coordinates. Its half slope reads a sum for log and log-odds scales. The reciprocal plate keeps the full slope and reads an average.</p>
+    <CalculationProof title="Prevalence-adjusted precision" formula="logit(P) = logit(π) + ln(TPR / FPR)" reading={results.precision} />
+    <p>{percent(prior, 2)} target prevalence · {percent(candidate.recall, 4)} TPR · {percent(candidate.falsePositiveRate, 4)} FPR. {RATE_STABILITY}</p>
+    <CalculationProof title="Expected F1" formula="1/F₁ = ½ (1/P + 1/R)" reading={results.f1} />
+    <CalculationProof title="Daily inference cost (USD)" formula="log(C) = log(N) + log(c)" reading={results.cost} />
+    <p>{requests.toLocaleString()} requests/day · {candidate.costPer1kUsd === null ? 'Unknown unit price' : '$' + candidate.costPer1kUsd / 1000 + ' per request'} · {candidate.metricProvenance.cost}.</p>
+    <CalculationProof title="Average requests in system" formula="L = λ (requests/s) × W (s)" reading={results.capacity} />
+    <p>{STEADY_STATE} Mean response time is distinct from P95. Maximum sustainable capacity is unknown.</p>
+    <section className="proof-section">
+      <h3>Constraint checks</h3>
+      <ul>{envelope.checks.get(candidate.id)?.map(check => <li key={check.key}>{check.label} · {gateValue(check.key, check.observed)} {check.passes ? 'meets' : 'misses'} {check.direction === 1 ? 'minimum' : 'maximum'} {gateValue(check.key, check.limit)}</li>)}</ul>
+    </section>
+    <section className="proof-section">
+      <h3>Evaluation provenance</h3>
       <dl className="provenance">
-        <dt>Dataset</dt><dd>{candidate.datasetId} · seed {manifest.seed}</dd>
+        <dt>Dataset</dt><dd>{candidate.datasetId} · {candidate.sampleCount.toLocaleString()} rows</dd>
+        <dt>Classification</dt><dd>{candidate.metricProvenance.classification} · TP {candidate.tp}, FP {candidate.fp}, TN {candidate.tn}, FN {candidate.fn}</dd>
+        <dt>Source precision</dt><dd>{percent(candidate.precision, 4)} {candidate.precisionInterval && ' · 95% Wilson interval ' + candidate.precisionInterval.map(v => percent(v, 2)).join('–')}</dd>
+        <dt>Recall interval</dt><dd>{candidate.recallInterval?.map(v => percent(v, 2)).join('–') ?? 'Unavailable'}</dd>
+        <dt>Timing</dt><dd>{candidate.metricProvenance.latency} · {manifest.benchmarkMethod}</dd>
+        <dt>Performance inputs</dt><dd>{candidate.performance ? candidate.performance.provenance + ' · ' + candidate.performance.method : 'Mean response time and measured throughput unavailable'}</dd>
+        <dt>Pricing</dt><dd>{manifest.costMethod}</dd>
+        <dt>Run · profile</dt><dd>{candidate.evaluationRunId} · {candidate.inferenceProfile}</dd>
         <dt>Dataset SHA-256</dt><dd><code>{candidate.datasetSha256}</code></dd>
-        <dt>Evaluation run</dt><dd>{candidate.evaluationRunId} · code {candidate.evaluationCodeVersion}</dd>
         <dt>Evaluation SHA-256</dt><dd><code>{manifest.evaluationSha256}</code></dd>
-        <dt>Classification</dt><dd>{candidate.metricProvenance.classification} · confusion counts from row-level labels and scores.</dd>
-        <dt>Latency</dt><dd>{candidate.metricProvenance.latency} · {manifest.benchmarkMethod}.</dd>
-        <dt>Cost</dt><dd>{candidate.metricProvenance.cost} · {manifest.costMethod}.</dd>
+        <dt>Benchmark SHA-256</dt><dd><code>{manifest.benchmarkSha256}</code></dd>
+        <dt>Evaluator SHA-256</dt><dd><code>{manifest.evaluationSourceSha256}</code></dd>
       </dl>
+    </section>
   </Drawer>;
 }

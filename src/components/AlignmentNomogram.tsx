@@ -25,6 +25,8 @@ type Props = {
   onGrab: () => void;
   onRelease: () => void;
   title: string;
+  inputMinimums?: [number, number];
+  markerY?: [number | null, number | null];
 };
 
 const ScalePlate = memo(function ScalePlate({ axes, scales, labels = false }: Pick<Props, 'axes' | 'scales'> & { labels?: boolean }) {
@@ -40,7 +42,7 @@ const ScalePlate = memo(function ScalePlate({ axes, scales, labels = false }: Pi
       {scale.ticks.map(value => {
         const y = scale.toY(value);
         return labels
-          ? <text key={value} className="axis-label" data-tick-value={value} x={x + (index === 0 ? -10 : 10)} y={y}
+          ? <text key={value} className="axis-label" data-tick-value={value} x={x + (index === 0 ? -18 : 18)} y={y}
             dominantBaseline="central" textAnchor={index === 0 ? 'end' : 'start'}>{scale.format(value)}</text>
           : <line key={value} className="major-tick" x1={x - 6} x2={x + 6} y1={y} y2={y} />;
       })}
@@ -60,7 +62,8 @@ type Drag = {
   frame: number | null;
 };
 
-export function AlignmentNomogram({ axes, width, scales, inputs, alignment, zeroAtTop, movable, setInput, stepInput, inputMaximums, onGrab, onRelease, title }: Props) {
+export function AlignmentNomogram({ axes, width, scales, inputs, alignment, zeroAtTop, movable, setInput, stepInput, inputMaximums,
+  inputMinimums = [0, 0], markerY, onGrab, onRelease, title }: Props) {
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<Drag | null>(null);
   const [active, setActive] = useState<Side | null>(null);
@@ -123,15 +126,15 @@ export function AlignmentNomogram({ axes, width, scales, inputs, alignment, zero
       const value = inputs[side];
       const scale = scales[side * 2];
       const x = side ? axes.right : axes.left;
-      const y = value !== null && value > 0 ? scale.toY(value) : zeroAtTop ? TOP - 13 : BOTTOM + 14;
+      const y = markerY?.[side] ?? (value !== null && value > 0 ? scale.toY(value) : zeroAtTop ? TOP - 13 : BOTTOM + 14);
       const enabled = movable[side] && value !== null;
       const label = value === null ? 'Unknown' : (scale.formatInput ?? scale.format)(value);
-      if (!enabled && (value === null || value === 0)) return null;
+      if (!enabled && (value === null || value === 0) && markerY?.[side] == null) return null;
       return <g key={side} className={'marker' + (enabled ? ' draggable' : '')} data-active={active === side || undefined}
         data-testid={side ? 'right-marker' : 'left-marker'}
         role={enabled ? 'slider' : undefined} tabIndex={enabled ? 0 : undefined}
         aria-label={enabled ? scale.label + ' marker' : undefined} aria-orientation={enabled ? 'vertical' : undefined}
-        aria-valuemin={enabled ? 0 : undefined} aria-valuemax={enabled ? inputMaximums[side] : undefined}
+        aria-valuemin={enabled ? inputMinimums[side] : undefined} aria-valuemax={enabled ? inputMaximums[side] : undefined}
         aria-valuenow={enabled ? value : undefined} aria-valuetext={enabled ? label : undefined}
         onPointerDown={event => {
           if (!enabled || event.button !== 0 || drag.current) return;
@@ -154,7 +157,8 @@ export function AlignmentNomogram({ axes, width, scales, inputs, alignment, zero
           const direction = event.key === 'ArrowUp' || event.key === 'ArrowRight' ? 1 : event.key === 'ArrowDown' || event.key === 'ArrowLeft' ? -1 : 0;
           if (direction || event.key === 'Home' || event.key === 'End') {
             event.preventDefault();
-            setInput(side, direction ? stepInput(side, value, direction) : event.key === 'Home' ? 0 : inputMaximums[side]);
+            const next = direction ? stepInput(side, value, direction) : event.key === 'Home' ? inputMinimums[side] : inputMaximums[side];
+            setInput(side, Math.min(inputMaximums[side], Math.max(inputMinimums[side], next)));
           }
         }}>
         <circle cx={x} cy={y} r="26" fill="transparent" />

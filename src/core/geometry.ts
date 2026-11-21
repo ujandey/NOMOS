@@ -16,11 +16,11 @@ function positive(value: number) {
 }
 
 export function reciprocalToY(value: number, { top, k }: Calibration) {
-  return top + k * (1 / positive(value) - 1);
+  return top + k / positive(value) - k;
 }
 
 export function reciprocalFromY(y: number, { top, k }: Calibration) {
-  return 1 / (1 + (y - top) / k);
+  return k / (k + (y - top));
 }
 
 export function logToY(value: number, reference: number, { top, k }: Calibration) {
@@ -37,10 +37,10 @@ export function intersectLineAtX(a: Point, b: Point, x: number): Point {
   }
   const t = (x - a.x) / (b.x - a.x);
   if (t < 0 || t > 1) throw new RangeError('Target axis is outside the straightedge.');
-  return { x, y: a.y + t * (b.y - a.y) };
+  return { x, y: (1 - t) * a.y + t * b.y };
 }
 
-function solve(leftY: number, rightY: number, inverse: (y: number) => number, axes: Axes): Alignment {
+export function solve(leftY: number, rightY: number, inverse: (y: number) => number, axes: Axes): Alignment {
   if (axes.center !== (axes.left + axes.right) / 2) throw new RangeError('Axes must be equally spaced.');
   const left = { x: axes.left, y: leftY };
   const right = { x: axes.right, y: rightY };
@@ -54,12 +54,43 @@ export function f1FromGeometry(p: number, r: number, cal: Calibration, axes = AX
 }
 
 export function costFromGeometry(requests: number, price: number, cal: Calibration, axes = AXES) {
-  return solve(logToY(requests, REQUEST_BASE, cal), logToY(price, PRICE_BASE, cal),
-    y => logFromY(y, TOTAL_BASE, { ...cal, k: cal.k / 2 }), axes);
+  return productFromGeometry(requests, price, REQUEST_BASE, PRICE_BASE, cal, axes);
+}
+
+export function productFromGeometry(a: number, b: number, aBase: number, bBase: number, cal: Calibration, axes = AXES) {
+  return scaledProductFromGeometry(a, b, aBase, bBase, aBase * bBase, cal, axes);
+}
+
+export function scaledProductFromGeometry(a: number, b: number, aBase: number, bBase: number, outputBase: number, cal: Calibration, axes = AXES) {
+  return solve(logToY(a, aBase, cal), logToY(b, bBase, cal),
+    y => logFromY(y, outputBase, { ...cal, k: cal.k / 2 }), axes);
+}
+
+export function logit(probability: number) {
+  if (!(probability > 0 && probability < 1)) throw new RangeError('Log-odds requires a probability strictly between zero and one.');
+  return Math.log(probability) - Math.log1p(-probability);
+}
+
+export function logistic(odds: number) {
+  const exponential = Math.exp(-Math.abs(odds));
+  return odds >= 0 ? 1 / (1 + exponential) : exponential / (1 + exponential);
+}
+
+export type LogOddsPlate = { prior: Calibration; ratio: Calibration; result: Calibration };
+
+export function prevalenceFromGeometry(prevalence: number, logRatio: number, plate: LogOddsPlate, axes = AXES) {
+  return solve(plate.prior.top + plate.prior.k * logit(prevalence),
+    plate.ratio.top + plate.ratio.k * logRatio,
+    y => logistic((y - plate.result.top) / plate.result.k), axes);
+}
+
+export function collinearityResidual({ left, right, intersection }: Alignment) {
+  const dx = right.x - left.x, dy = right.y - left.y;
+  return Math.abs(dx * (intersection.y - left.y) - dy * (intersection.x - left.x)) / Math.hypot(dx, dy);
 }
 
 export function reciprocalCalibration(min: number): Calibration {
-  return { top: TOP, k: (BOTTOM - TOP) / (1 / min - 1) };
+  return { top: TOP, k: (BOTTOM - TOP) * min / (1 - min) };
 }
 
 export function costCalibration(minLog = -3, maxLog = 2): Calibration {

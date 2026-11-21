@@ -1,162 +1,152 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { ArrowDownToLine } from 'lucide-react';
-import { DEFAULT_MISSION, type Manifest, type Mission, type Ranking } from './core/contracts';
-import { evaluateEnvelope, resolveSelection } from './core/envelope';
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { Activity, Crosshair, Download, FileCheck2, Layers3, Maximize, Minimize, Ruler } from 'lucide-react';
+import { RANKING, type Manifest, type Mission, type Ranking } from './core/contracts';
+import { DAILY_REQUESTS } from './core/deployment';
+import { DEPLOYMENT_MISSION, evaluateEnvelope, resolveSelection } from './core/envelope';
 import { candidateLabel, dollars, percent } from './core/display';
-import { instrumentReading } from './core/instruments';
 import { Drawer } from './components/Drawer';
 import { Envelope } from './components/Envelope';
 import { Evidence } from './components/Evidence';
-import { InstrumentPanel } from './components/InstrumentPanel';
-import { MissionPanel } from './components/MissionPanel';
+import { InstrumentPanel, type Plate } from './components/InstrumentPanel';
+import { MissionBrief, MissionPanel } from './components/MissionPanel';
 
-const difference = (label: string, old: number | null, next: number | null) => {
-  if (old === null || next === null || old === next) return '';
-  return label + ' ' + (next > old ? '+' : '−') + (Math.abs(next - old) * 100).toFixed(2) + ' pp';
-};
+const views = [
+  ['map', 'Operating map', Crosshair], ['prevalence', 'Prevalence', Activity], ['f1', 'F1 alignment', Ruler],
+  ['cost', 'Economics', Layers3], ['capacity', 'Throughput', Activity],
+] as const;
+type View = typeof views[number][0];
+const pocketQuery = '(max-width: 640px)';
+function subscribe(listener: () => void) {
+  const query = window.matchMedia(pocketQuery);
+  query.addEventListener('change', listener);
+  return () => query.removeEventListener('change', listener);
+}
+const isPocket = () => window.matchMedia(pocketQuery).matches;
 
 export function App({ manifest }: { manifest: Manifest }) {
   const candidates = manifest.candidates;
-  const models = useMemo(() => [...new Map(candidates.map(c => [c.modelId, c.modelName]))], [candidates]);
-  const [mission, setMission] = useState<Mission>(DEFAULT_MISSION);
-  const [ranking, setRanking] = useState<Ranking>('min_latency');
-  const [selection, setSelection] = useState(() => ({
-    id: evaluateEnvelope(candidates, DEFAULT_MISSION, 'min_latency').recommendedId ?? candidates[0]?.id ?? null,
-    fromId: null as string | null,
-  }));
-  const [requests, setRequests] = useState(1_000_000);
-  const [freeMode, setFreeMode] = useState(!candidates.length);
-  const [drawer, setDrawer] = useState<'source' | 'evidence' | null>(null);
-  const [downloadFeedback, setDownloadFeedback] = useState<{ key: string; text: string; error?: boolean } | null>(null);
-  const cachedExport = useRef<{ key: string; record: Promise<ReturnType<typeof import('./core/export').exportDecision>> } | null>(null);
-  const envelope = useMemo(() => evaluateEnvelope(candidates, mission, ranking), [candidates, mission, ranking]);
-  const selected = resolveSelection(candidates, selection.id, envelope.recommendedId);
-  const previous = candidates.find(candidate => candidate.id === selection.fromId);
-  const recommended = candidates.find(candidate => candidate.id === envelope.recommendedId);
-  const thresholdRows = candidates.filter(c => c.modelId === selected?.modelId).sort((a, b) => a.threshold - b.threshold);
-  const candidateId = selected?.id;
-  const passes = candidateId ? envelope.feasibleIds.has(candidateId) : false;
-  const f1 = instrumentReading('f1', selected?.precision ?? null, selected?.recall ?? null, false).value;
-  const unitPrice = selected?.costPer1kUsd == null ? null : selected.costPer1kUsd / 1000;
-  const monthlyCost = instrumentReading('cost', requests, unitPrice, false).value;
-  const changes = selected && previous ? [
-    difference('Precision', previous.precision, selected.precision),
-    difference('recall', previous.recall, selected.recall),
-    difference('F1', instrumentReading('f1', previous.precision, previous.recall, false).value, f1),
-  ].filter(Boolean).join(' · ') : '';
-  const decisionKey = JSON.stringify([candidateId, mission, ranking, requests]);
-
-  const select = useCallback((id: string) => {
-    setSelection(current => current.id === id ? current : { id, fromId: current.id });
-    setFreeMode(false);
-  }, []);
-
-  function chooseModel(model: string) {
-    if (!selected) return;
-    const options = candidates.filter(candidate => candidate.modelId === model);
-    const closest = options.sort((a, b) => Math.abs(a.threshold - selected.threshold) - Math.abs(b.threshold - selected.threshold))[0];
-    if (closest) select(closest.id);
-  }
+  const [mission, setMission] = useState<Mission>(DEPLOYMENT_MISSION);
+  const [ranking, setRanking] = useState<Ranking>('min_fpr');
+  const [requests, setRequests] = useState(DAILY_REQUESTS);
+  const [selectedId, select] = useState<string | null>(() => evaluateEnvelope(candidates, DEPLOYMENT_MISSION, 'min_fpr').recommendedId);
+  const [view, setView] = useState<View>('map');
+  const [zoom, setZoom] = useState(true);
+  const [drawer, setDrawer] = useState<'evidence' | 'export' | null>(null);
+  const [feedback, setFeedback] = useState<{ key: string; text: string; error?: boolean }>();
+  const exportCache = useRef<{ key: string; record: ReturnType<typeof import('./core/export').exportDecision> } | null>(null);
+  const pocket = useSyncExternalStore(subscribe, isPocket);
+  const envelope = useMemo(() => evaluateEnvelope(candidates, mission, ranking, requests), [candidates, mission, ranking, requests]);
+  const selected = resolveSelection(candidates, selectedId, envelope.recommendedId);
+  const values = selected ? envelope.values.get(selected.id) : undefined;
+  const prior = mission.targetPrevalence ?? 0.1;
+  const setLimit = useCallback((key: keyof Mission, value: number) => setMission(m => m[key] === value ? m : { ...m, [key]: value }), []);
+  const selectPoint = useCallback((id: string) => select(id), []);
+  const decisionKey = JSON.stringify([selected?.id, mission, requests, ranking]);
+  const passes = selected ? envelope.feasibleIds.has(selected.id) : false;
 
   async function save(format: 'json' | 'yaml') {
-    if (!candidateId) return;
+    if (!selected) return;
     try {
-      const exporter = import('./core/export');
-      if (cachedExport.current?.key !== decisionKey) {
-        cachedExport.current = { key: decisionKey, record: exporter.then(module => module.exportDecision(manifest, candidateId, mission, ranking, requests)) };
+      const exporter = await import('./core/export');
+      if (exportCache.current?.key !== decisionKey) {
+        exportCache.current = { key: decisionKey, record: exporter.exportDecision(manifest, selected.id, mission, ranking, requests) };
       }
-      const [module, record] = await Promise.all([exporter, cachedExport.current.record]);
-      const name = format === 'json' ? 'nomos-decision.json' : 'nomos-config.yaml';
-      module.download(module.decisionFiles(record)[format], name, format === 'json' ? 'application/json' : 'application/yaml');
-      setDownloadFeedback({ key: decisionKey, text: 'Download started · ' + name });
+      const file = format === 'json' ? 'nomos-decision.json' : 'nomos-config.yaml';
+      exporter.download(exporter.decisionFiles(exportCache.current.record)[format], file, format === 'json' ? 'application/json' : 'application/yaml');
+      setFeedback({ key: decisionKey, text: 'Download started · ' + file });
     } catch {
-      if (cachedExport.current?.key === decisionKey) cachedExport.current = null;
-      setDownloadFeedback({ key: decisionKey, text: 'Could not prepare the download. Try exporting again.', error: true });
+      setFeedback({ key: decisionKey, text: 'Could not prepare the download. Try again.', error: true });
     }
   }
 
   return <>
-    <a className="skip-link" href="#main">Skip to workbench</a>
+    <a className="skip-link" href="#main">Skip to workspace</a>
     <header className="topbar">
       <div className="top-inner">
-        <a href="#main" className="brand" aria-label="NOMOS workbench"><span className="brand-mark" aria-hidden="true"><i /></span> NOMOS</a>
-        <div className="header-actions">
-          <a href="#mission" className="source-button">Mission limits</a>
-          <a href="#decision" className="header-export"><ArrowDownToLine size={16} /> Export decision</a>
+        <div className="brand"><span className="brand-mark"><Crosshair size={22} /></span><span>NOMOS <small>3.0</small></span></div>
+        <span className="brand-caption">Geometric computer for AI calibration</span>
+        <div className="top-actions">
+          <button className="button header-evidence" disabled={!selected} onClick={() => setDrawer('evidence')}><FileCheck2 size={17} /> Evidence</button>
+          <button className="button primary" disabled={!selected} onClick={() => setDrawer('export')}><Download size={17} /> Export decision</button>
         </div>
       </div>
     </header>
-    <main className="workbench" id="main" tabIndex={-1}>
-      <div className="workspace-heading">
-        <div><h1>Calibrate a fraud model</h1>
-          <p>Explore where a model catches fraud and which settings fit your limits.</p></div>
-        <button className="dataset-link" onClick={() => setDrawer('source')}>
-          <span>Synthetic demo data</span><small>{manifest.sampleCount.toLocaleString()} records · {models.length} models</small>
-        </button>
-      </div>
-
-      <div className="workstation">
-        <section className="selection-strip" aria-labelledby="candidate-title">
-          <div className="selection-identity"><h2 id="candidate-title">Operating point</h2><span>{candidates.length} evaluated settings</span></div>
-          {selected ? <>
-            <label>Model<select aria-label="Model variant" value={selected.modelId} onChange={event => chooseModel(event.target.value)}>
-              {models.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+    <main id="main" className="workspace" tabIndex={-1}>
+      <div className="workspace-meta"><div><span className="signal" /><span className="desktop-meta">Calibration workspace</span>
+        <span className="mobile-meta">{envelope.feasibleIds.size} / {candidates.length} feasible</span></div>
+        <span>Synthetic evaluation · {manifest.sampleCount.toLocaleString('en-US')} records</span></div>
+      <div className="workbench">
+        <MissionBrief />
+        <section className="instrument" aria-labelledby="instrument-title">
+          <nav className="instrument-nav" aria-label="Instruments">
+            {views.map(([id, label, Icon]) => <button key={id} aria-pressed={view === id} onClick={() => setView(id)}><Icon size={17} />{label}</button>)}
+          </nav>
+          <div className="instrument-heading">
+            <div><h1 id="instrument-title">{views.find(([id]) => id === view)?.[1]}</h1>
+              <p>{view === 'map' ? 'Drag the operating point to test evaluated settings.' : {
+                prevalence: 'See how rarer fraud changes which alerts are correct.',
+                f1: 'Balance expected precision with evaluated recall.',
+                cost: 'Change daily requests to test the inference budget.',
+                capacity: 'Read average requests in the system from long-run rates.',
+              }[view]}</p></div>
+            {view === 'map' && <button className="button quiet" aria-pressed={zoom} onClick={() => setZoom(!zoom)}>{zoom ? <Minimize size={16} /> : <Maximize size={16} />}{zoom ? 'Show full map' : 'Zoom to high recall'}</button>}
+          </div>
+          <div hidden={view !== 'map'}>
+            <div className="map-tools"><span>Target fraud prevalence</span>
+              <div className="segmented">
+                {[0.1, 0.01].map(p => <button key={p} aria-pressed={prior === p} onClick={() => setLimit('targetPrevalence', p)}>{percent(p, 0)}</button>)}
+              </div>
+              {prior !== 0.1 && prior !== 0.01 && <strong>{percent(prior, 2)}</strong>}
+              <button className="text-link" onClick={() => setView('prevalence')}>Open prevalence scale</button>
+            </div>
+            <Envelope candidates={candidates} selected={selected} mission={mission} envelope={envelope}
+              select={selectPoint} setLimit={setLimit} zoom={zoom} pocket={pocket} />
+          </div>
+          {views.slice(1).map(([id]) => <div key={id} hidden={view !== id}>
+            <InstrumentPanel kind={id as Plate} candidate={selected} prior={prior} setPrior={p => setLimit('targetPrevalence', p)}
+              requests={requests} setRequests={setRequests} pocket={pocket} onEvidence={() => setDrawer('evidence')} />
+          </div>)}
+          <div className="point-strip" aria-label="Current evaluated operating point">
+            <div><span>Operating point</span><strong>{selected ? selected.modelName : 'Unavailable'}{selected && <small> / {selected.threshold.toFixed(2)}</small>}</strong></div>
+            <div><span>Expected precision</span><strong data-testid="selected-precision">{percent(values?.precision ?? null)}</strong></div>
+            <div><span>Recall</span><strong>{percent(values?.recall ?? null)}</strong></div>
+            <div><span>False-positive rate</span><strong>{percent(values?.falsePositiveRate ?? null)}</strong></div>
+          </div>
+          <details className="candidate-drawer">
+            <summary>Evaluated configurations <span>{candidates.length} settings</span></summary>
+            <div className="data-tools"><label>Rank feasible points <select value={ranking} onChange={event => setRanking(event.target.value as Ranking)}>
+              {Object.entries(RANKING).map(([key, title]) => <option key={key} value={key}>{title}</option>)}
             </select></label>
-            <label>Threshold<select aria-label="Threshold" value={selected.id} onChange={event => select(event.target.value)}>
-              {thresholdRows.map(point => <option key={point.id} value={point.id}>{point.threshold.toFixed(2)}</option>)}
-            </select></label>
-            <label className="threshold-slider">Sweep evaluated thresholds
-              <input aria-label="Sweep evaluated thresholds" type="range" min={0} max={thresholdRows.length - 1} step={1}
-                value={thresholdRows.findIndex(point => point.id === selected.id)}
-                aria-valuetext={selected.threshold.toFixed(2)}
-                onChange={event => select(thresholdRows[Number(event.target.value)].id)} />
-            </label>
-            <button className="outline-button evidence-button" onClick={() => setDrawer('evidence')}>View evidence</button>
-          </> : <p role="status">No evaluated settings are available. Try the free instrument below.</p>}
+            {envelope.recommendedId && <button className="button quiet" onClick={() => selectPoint(envelope.recommendedId!)}>Select recommended</button>}</div>
+            <div className="table-scroll" role="region" aria-label="Evaluated settings table" tabIndex={0}><table>
+              <thead><tr><th scope="col">Configuration</th><th scope="col">Recall</th><th scope="col">Expected precision</th><th scope="col">Daily cost</th><th scope="col">Mission</th></tr></thead>
+              <tbody>{candidates.map(c => <tr key={c.id}>
+                <th scope="row"><button aria-pressed={c.id === selected?.id} className="text-link" onClick={() => selectPoint(c.id)}>{candidateLabel(c)}</button></th>
+                <td>{percent(c.recall)}</td><td>{percent(envelope.values.get(c.id)?.precision ?? null)}</td><td>{dollars(envelope.values.get(c.id)?.dailyCostUsd ?? null)}</td>
+                <td>{envelope.feasibleParetoIds.has(c.id) ? 'Feasible · Pareto' : envelope.feasibleIds.has(c.id) ? 'Feasible' : 'Outside limits'}</td>
+              </tr>)}</tbody>
+            </table></div>
+          </details>
         </section>
-
-        <InstrumentPanel precision={selected?.precision ?? null} recall={selected?.recall ?? null} perRequest={unitPrice}
-          requests={requests} setRequests={setRequests} freeMode={freeMode} setFreeMode={setFreeMode} selectionChanged={changes}
-          hasCandidate={Boolean(selected)} />
-        <MissionPanel mission={mission} setMission={setMission} envelope={envelope} total={candidates.length}
-          selected={selected} recommended={recommended} select={select} />
+        <MissionPanel mission={mission} setMission={setMission} envelope={envelope} total={candidates.length} selected={selected} select={selectPoint} />
       </div>
-
-      {selected && <Envelope candidates={candidates} selected={selected} select={select}
-        mission={mission} envelope={envelope} ranking={ranking} setRanking={setRanking} />}
-
-      <section id="decision" className="decision-panel" tabIndex={-1} aria-labelledby="decision-title">
-        <div>
-          <h2 id="decision-title">Export configuration</h2>
-          <p>{selected ? candidateLabel(selected) + ' threshold · ' + (passes ? 'Meets demo limits' : 'Review only · outside mission')
-            : 'Select an evaluated configuration to export.'}</p>
-          {selected && <p className="export-metrics">F1 {percent(f1, 2)} · {requests.toLocaleString('en-US')} requests/month · {dollars(monthlyCost)} estimated monthly cost</p>}
-          {freeMode && selected && <p className="export-scope">Practice inputs are exploratory. Exports use the evaluated point and its linked request volume.</p>}
-          {downloadFeedback?.key === decisionKey &&
-            <p role={downloadFeedback.error ? 'alert' : 'status'} className={downloadFeedback.error ? 'field-error' : 'export-feedback'}>{downloadFeedback.text}</p>}
-        </div>
-        <div className="export-actions">
-          <button className="outline-button" disabled={!selected} onClick={() => void save('yaml')}><ArrowDownToLine size={16} /> Configuration YAML</button>
-          <button className="primary-button" disabled={!selected} onClick={() => void save('json')}><ArrowDownToLine size={16} /> Decision JSON</button>
-        </div>
-      </section>
-      <footer><span>NOMOS</span><span>Evaluation {manifest.evaluationRunId}</span></footer>
+      <footer><span>NOMOS / FRAUD DEPLOYMENT</span><span>Evaluation {manifest.evaluationRunId}</span></footer>
     </main>
-
-    {selected && drawer === 'evidence' && <Evidence candidate={selected} manifest={manifest} envelope={envelope} close={() => setDrawer(null)} />}
-    {drawer === 'source' && <Drawer titleId="dataset-title" label="Dataset" close={() => setDrawer(null)}>
-      <h2 id="dataset-title">Evaluation dataset</h2>
-      <p>{manifest.datasetId} · {manifest.sampleCount.toLocaleString()} synthetic records · {candidates.length} evaluated settings</p>
-      <h3>What was evaluated</h3>
-      <p>Precision and recall are calculated from generated fraud labels and model scores. Timing samples are synthetic. Costs are estimated from declared rates.</p>
+    {selected && drawer === 'evidence' && <Evidence candidate={selected} manifest={manifest} mission={mission} requests={requests} envelope={envelope} close={() => setDrawer(null)} />}
+    {selected && drawer === 'export' && <Drawer titleId="export-title" label="Decision export" close={() => setDrawer(null)}>
+      <h2 id="export-title">Export {candidateLabel(selected)}</h2>
+      <p>{passes ? 'Feasible under the current demo mission.' : 'Review only. This point misses one or more mission constraints.'}</p>
+      <p>The decision includes evaluated rates, source hashes, deployment assumptions, geometric readings, numerical checks and every constraint result.</p>
       <dl className="provenance">
-        <dt>Model variants</dt><dd>{models.map(([, name]) => name).join(', ') || 'None available'}</dd>
-        <dt>Data seed</dt><dd>{manifest.seed}</dd>
-        <dt>Evaluation run</dt><dd>{manifest.evaluationRunId}</dd>
-        <dt>Dataset SHA-256</dt><dd><code>{manifest.datasetSha256}</code></dd>
-        <dt>Latency method</dt><dd>{manifest.benchmarkMethod}</dd>
-        <dt>Cost method</dt><dd>{manifest.costMethod}</dd>
+        <dt>Target prevalence</dt><dd>{percent(prior, 2)}</dd>
+        <dt>Requests per day</dt><dd>{requests.toLocaleString()}</dd>
+        <dt>Expected precision</dt><dd>{percent(values?.precision ?? null, 2)}</dd>
       </dl>
+      <div className="export-actions">
+        <button className="button primary" onClick={() => void save('json')}><Download size={16} /> Decision JSON</button>
+        <button className="button" onClick={() => void save('yaml')}>Configuration YAML</button>
+      </div>
+      {feedback?.key === decisionKey && <p role={feedback.error ? 'alert' : 'status'}>{feedback.text}</p>}
     </Drawer>}
   </>;
 }

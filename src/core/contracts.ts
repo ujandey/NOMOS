@@ -13,12 +13,17 @@ export const missionSchema = z.strictObject({
   minRecall: ratio,
   maxP95LatencyMs: latency,
   maxCostPer1kUsd: cost,
+  maxFalsePositiveRate: ratio.optional(),
+  maxDailyCostUsd: z.number().nonnegative().max(1e12).optional(),
+  minThroughputRps: z.number().nonnegative().max(1e9).optional(),
+  targetPrevalence: ratio.optional(),
 });
 export const missionPatchSchema = missionSchema.partial();
 export type Mission = z.infer<typeof missionSchema>;
 export const DEFAULT_MISSION: Mission = { minPrecision: 0.8, minRecall: 0.9, maxP95LatencyMs: 100, maxCostPer1kUsd: 5 };
 export const RANKING = {
-  min_latency: 'Lowest latency', min_cost: 'Lowest cost', max_recall: 'Highest recall', max_precision: 'Highest precision',
+  min_fpr: 'Lowest false-positive rate', min_latency: 'Lowest latency', min_cost: 'Lowest cost',
+  max_recall: 'Highest recall', max_precision: 'Highest precision',
 } as const;
 export type Ranking = keyof typeof RANKING;
 
@@ -30,6 +35,12 @@ export const candidateSchema = z.strictObject({
   precision: ratio.nullable(), recall: ratio.nullable(), falsePositiveRate: ratio.nullable(),
   precisionInterval: interval, recallInterval: interval,
   p95LatencyMs: latency.nullable(), costPer1kUsd: cost.nullable(),
+  performance: z.strictObject({
+    requestsPerSecond: z.number().nonnegative().nullable(),
+    meanResponseMs: latency.nullable(),
+    provenance: provenance,
+    method: z.string().min(1),
+  }).optional(),
   metricProvenance: z.strictObject({ classification: provenance, latency: provenance, cost: provenance }),
 }).superRefine((candidate, context) => {
   const { tp, fp, tn, fn, sampleCount, precision, recall, falsePositiveRate } = candidate;
