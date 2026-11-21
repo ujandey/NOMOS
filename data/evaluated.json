@@ -1,0 +1,1049 @@
+{
+  "schemaVersion": "2.0",
+  "datasetId": "fraud-demo-v2",
+  "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+  "benchmarkSha256": "04bc146036c30719e67aa54fbeb04f812db2b6523ab48cb48e0985a126fbb536",
+  "evaluationSourceSha256": "9c28e3470898465f7d3beb9f1847d2d5dd0f5291e9261771ac68e4fca0d0bdee",
+  "seed": 61273,
+  "sampleCount": 1200,
+  "evaluationRunId": "eval-0d7d37f1b0988e97",
+  "benchmarkMethod": "Synthetic timing samples per fixed CPU profile, 240/profile, nearest-rank p95",
+  "costMethod": "Estimated from declared synthetic USD/request rate multiplied by 1,000",
+  "intervalMethod": "95% Wilson score interval, conditional on each metric denominator",
+  "generation": {
+    "prevalence": 0.24,
+    "thresholds": [
+      0.35,
+      0.4,
+      0.45,
+      0.5,
+      0.55,
+      0.6,
+      0.65,
+      0.7,
+      0.75
+    ],
+    "distributions": {
+      "lite": {
+        "positive": [
+          0.66,
+          0.2
+        ],
+        "negative": [
+          0.36,
+          0.2
+        ],
+        "latency": [
+          26,
+          6
+        ],
+        "unitPriceUsd": 0.0012
+      },
+      "balanced": {
+        "positive": [
+          0.76,
+          0.155
+        ],
+        "negative": [
+          0.24,
+          0.16
+        ],
+        "latency": [
+          63,
+          9
+        ],
+        "unitPriceUsd": 0.003
+      },
+      "high_recall": {
+        "positive": [
+          0.82,
+          0.135
+        ],
+        "negative": [
+          0.21,
+          0.17
+        ],
+        "latency": [
+          86,
+          12
+        ],
+        "unitPriceUsd": 0.0046
+      }
+    }
+  },
+  "candidates": [
+    {
+      "id": "lite-t35",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.35,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 271,
+      "fp": 447,
+      "tn": 460,
+      "fn": 22,
+      "precision": 0.3774373259052925,
+      "recall": 0.9249146757679181,
+      "falsePositiveRate": 0.4928335170893054,
+      "precisionInterval": [
+        0.3427212069165167,
+        0.4134579403888496
+      ],
+      "recallInterval": [
+        0.888936867864682,
+        0.9498947461195614
+      ]
+    },
+    {
+      "id": "lite-t40",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.4,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 253,
+      "fp": 362,
+      "tn": 545,
+      "fn": 40,
+      "precision": 0.4113821138211382,
+      "recall": 0.863481228668942,
+      "falsePositiveRate": 0.39911797133406834,
+      "precisionInterval": [
+        0.3731581267808668,
+        0.45070629205151425
+      ],
+      "recallInterval": [
+        0.8194372871430801,
+        0.8981174669880195
+      ]
+    },
+    {
+      "id": "lite-t45",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.45,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 238,
+      "fp": 285,
+      "tn": 622,
+      "fn": 55,
+      "precision": 0.45506692160611856,
+      "recall": 0.8122866894197952,
+      "falsePositiveRate": 0.31422271223814774,
+      "precisionInterval": [
+        0.4128709305779593,
+        0.4979181707482596
+      ],
+      "recallInterval": [
+        0.7636409265781705,
+        0.8528497776753095
+      ]
+    },
+    {
+      "id": "lite-t50",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.5,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 221,
+      "fp": 215,
+      "tn": 692,
+      "fn": 72,
+      "precision": 0.5068807339449541,
+      "recall": 0.7542662116040956,
+      "falsePositiveRate": 0.237045203969129,
+      "precisionInterval": [
+        0.4600977980101318,
+        0.5535434808635952
+      ],
+      "recallInterval": [
+        0.7018896191819575,
+        0.8000618285435537
+      ]
+    },
+    {
+      "id": "lite-t55",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.55,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 196,
+      "fp": 150,
+      "tn": 757,
+      "fn": 97,
+      "precision": 0.5664739884393064,
+      "recall": 0.6689419795221843,
+      "falsePositiveRate": 0.16538037486218302,
+      "precisionInterval": [
+        0.5138099292072471,
+        0.6176782030314669
+      ],
+      "recallInterval": [
+        0.613176761721362,
+        0.7203346028747829
+      ]
+    },
+    {
+      "id": "lite-t60",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.6,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 174,
+      "fp": 107,
+      "tn": 800,
+      "fn": 119,
+      "precision": 0.6192170818505338,
+      "recall": 0.5938566552901023,
+      "falsePositiveRate": 0.11797133406835722,
+      "precisionInterval": [
+        0.561195772122311,
+        0.6740227956992227
+      ],
+      "recallInterval": [
+        0.5367604360426669,
+        0.6485236553996357
+      ]
+    },
+    {
+      "id": "lite-t65",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.65,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 146,
+      "fp": 70,
+      "tn": 837,
+      "fn": 147,
+      "precision": 0.6759259259259259,
+      "recall": 0.49829351535836175,
+      "falsePositiveRate": 0.07717750826901874,
+      "precisionInterval": [
+        0.6109076663545057,
+        0.7347960075916664
+      ],
+      "recallInterval": [
+        0.4414364200476071,
+        0.5551947782898056
+      ]
+    },
+    {
+      "id": "lite-t70",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.7,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 114,
+      "fp": 38,
+      "tn": 869,
+      "fn": 179,
+      "precision": 0.75,
+      "recall": 0.3890784982935154,
+      "falsePositiveRate": 0.04189636163175303,
+      "precisionInterval": [
+        0.6755747457209735,
+        0.8121003606025827
+      ],
+      "recallInterval": [
+        0.33503316808694317,
+        0.4459947238448808
+      ]
+    },
+    {
+      "id": "lite-t75",
+      "modelId": "lite",
+      "modelName": "Lite",
+      "modelVersion": "demo-2",
+      "threshold": 0.75,
+      "inferenceProfile": "lite-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 35.137,
+      "costPer1kUsd": 1.2,
+      "tp": 92,
+      "fp": 21,
+      "tn": 886,
+      "fn": 201,
+      "precision": 0.8141592920353983,
+      "recall": 0.31399317406143346,
+      "falsePositiveRate": 0.023153252480705624,
+      "precisionInterval": [
+        0.7325480865089808,
+        0.8751129331035639
+      ],
+      "recallInterval": [
+        0.2635483565955489,
+        0.36925226218243284
+      ]
+    },
+    {
+      "id": "balanced-t35",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.35,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 293,
+      "fp": 222,
+      "tn": 685,
+      "fn": 0,
+      "precision": 0.5689320388349515,
+      "recall": 1.0,
+      "falsePositiveRate": 0.24476295479603086,
+      "precisionInterval": [
+        0.5258064286191684,
+        0.6110369149358748
+      ],
+      "recallInterval": [
+        0.9870588871380855,
+        0.9999999999999999
+      ]
+    },
+    {
+      "id": "balanced-t40",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.4,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 292,
+      "fp": 128,
+      "tn": 779,
+      "fn": 1,
+      "precision": 0.6952380952380952,
+      "recall": 0.9965870307167235,
+      "falsePositiveRate": 0.14112458654906285,
+      "precisionInterval": [
+        0.6496107247169673,
+        0.7373264108249811
+      ],
+      "recallInterval": [
+        0.9809240109677884,
+        0.9993972728451224
+      ]
+    },
+    {
+      "id": "balanced-t45",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.45,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 288,
+      "fp": 80,
+      "tn": 827,
+      "fn": 5,
+      "precision": 0.782608695652174,
+      "recall": 0.9829351535836177,
+      "falsePositiveRate": 0.08820286659316427,
+      "precisionInterval": [
+        0.7376635642071964,
+        0.8217146198707118
+      ],
+      "recallInterval": [
+        0.9606814196881092,
+        0.992689450824103
+      ]
+    },
+    {
+      "id": "balanced-t50",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.5,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 274,
+      "fp": 48,
+      "tn": 859,
+      "fn": 19,
+      "precision": 0.8509316770186336,
+      "recall": 0.9351535836177475,
+      "falsePositiveRate": 0.05292171995589857,
+      "precisionInterval": [
+        0.8079027764640563,
+        0.8856860652320053
+      ],
+      "recallInterval": [
+        0.9009481150894731,
+        0.9580963088702943
+      ]
+    },
+    {
+      "id": "balanced-t55",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.55,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 268,
+      "fp": 21,
+      "tn": 886,
+      "fn": 25,
+      "precision": 0.9273356401384083,
+      "recall": 0.9146757679180887,
+      "falsePositiveRate": 0.023153252480705624,
+      "precisionInterval": [
+        0.8914749407509892,
+        0.951984865093092
+      ],
+      "recallInterval": [
+        0.8770793819548219,
+        0.9415394220538973
+      ]
+    },
+    {
+      "id": "balanced-t60",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.6,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 250,
+      "fp": 10,
+      "tn": 897,
+      "fn": 43,
+      "precision": 0.9615384615384616,
+      "recall": 0.8532423208191127,
+      "falsePositiveRate": 0.011025358324145534,
+      "precisionInterval": [
+        0.93066060847243,
+        0.9789765693719492
+      ],
+      "recallInterval": [
+        0.8081570040404019,
+        0.889184940115174
+      ]
+    },
+    {
+      "id": "balanced-t65",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.65,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 232,
+      "fp": 4,
+      "tn": 903,
+      "fn": 61,
+      "precision": 0.9830508474576272,
+      "recall": 0.7918088737201365,
+      "falsePositiveRate": 0.004410143329658214,
+      "precisionInterval": [
+        0.9572384055106576,
+        0.9933895681561195
+      ],
+      "recallInterval": [
+        0.7416906406615646,
+        0.8343744436408675
+      ]
+    },
+    {
+      "id": "balanced-t70",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.7,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 189,
+      "fp": 2,
+      "tn": 905,
+      "fn": 104,
+      "precision": 0.9895287958115183,
+      "recall": 0.6450511945392492,
+      "falsePositiveRate": 0.002205071664829107,
+      "precisionInterval": [
+        0.9626309645142898,
+        0.9971237054201508
+      ],
+      "recallInterval": [
+        0.5887082763616319,
+        0.6976398649582906
+      ]
+    },
+    {
+      "id": "balanced-t75",
+      "modelId": "balanced",
+      "modelName": "Balanced",
+      "modelVersion": "demo-2",
+      "threshold": 0.75,
+      "inferenceProfile": "balanced-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 77.87,
+      "costPer1kUsd": 3.0,
+      "tp": 150,
+      "fp": 1,
+      "tn": 906,
+      "fn": 143,
+      "precision": 0.9933774834437086,
+      "recall": 0.5119453924914675,
+      "falsePositiveRate": 0.0011025358324145535,
+      "precisionInterval": [
+        0.9634445765212885,
+        0.9988300050721441
+      ],
+      "recallInterval": [
+        0.4549273244444336,
+        0.5686542871936775
+      ]
+    },
+    {
+      "id": "high_recall-t35",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.35,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 293,
+      "fp": 171,
+      "tn": 736,
+      "fn": 0,
+      "precision": 0.6314655172413793,
+      "recall": 1.0,
+      "falsePositiveRate": 0.18853362734288864,
+      "precisionInterval": [
+        0.5866595216822023,
+        0.6741125789938048
+      ],
+      "recallInterval": [
+        0.9870588871380855,
+        0.9999999999999999
+      ]
+    },
+    {
+      "id": "high_recall-t40",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.4,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 293,
+      "fp": 101,
+      "tn": 806,
+      "fn": 0,
+      "precision": 0.7436548223350253,
+      "recall": 1.0,
+      "falsePositiveRate": 0.1113561190738699,
+      "precisionInterval": [
+        0.698334329782736,
+        0.7842699733714353
+      ],
+      "recallInterval": [
+        0.9870588871380855,
+        0.9999999999999999
+      ]
+    },
+    {
+      "id": "high_recall-t45",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.45,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 292,
+      "fp": 61,
+      "tn": 846,
+      "fn": 1,
+      "precision": 0.8271954674220963,
+      "recall": 0.9965870307167235,
+      "falsePositiveRate": 0.06725468577728776,
+      "precisionInterval": [
+        0.7842877024321114,
+        0.8630586030207904
+      ],
+      "recallInterval": [
+        0.9809240109677884,
+        0.9993972728451224
+      ]
+    },
+    {
+      "id": "high_recall-t50",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.5,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 289,
+      "fp": 34,
+      "tn": 873,
+      "fn": 4,
+      "precision": 0.8947368421052632,
+      "recall": 0.9863481228668942,
+      "falsePositiveRate": 0.037486218302094816,
+      "precisionInterval": [
+        0.8565045107240794,
+        0.9236902690939046
+      ],
+      "recallInterval": [
+        0.9654298873823268,
+        0.9946785864550602
+      ]
+    },
+    {
+      "id": "high_recall-t55",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.55,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 286,
+      "fp": 16,
+      "tn": 891,
+      "fn": 7,
+      "precision": 0.9470198675496688,
+      "recall": 0.9761092150170648,
+      "falsePositiveRate": 0.017640573318632856,
+      "precisionInterval": [
+        0.9156813345763579,
+        0.9671289980747602
+      ],
+      "recallInterval": [
+        0.9515155343949665,
+        0.9883801294668965
+      ]
+    },
+    {
+      "id": "high_recall-t60",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.6,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 280,
+      "fp": 11,
+      "tn": 896,
+      "fn": 13,
+      "precision": 0.9621993127147767,
+      "recall": 0.9556313993174061,
+      "falsePositiveRate": 0.012127894156560088,
+      "precisionInterval": [
+        0.9335909052461113,
+        0.9787638262626308
+      ],
+      "recallInterval": [
+        0.9255798814440627,
+        0.9738901624667525
+      ]
+    },
+    {
+      "id": "high_recall-t65",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.65,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 260,
+      "fp": 5,
+      "tn": 902,
+      "fn": 33,
+      "precision": 0.9811320754716981,
+      "recall": 0.8873720136518771,
+      "falsePositiveRate": 0.005512679162072767,
+      "precisionInterval": [
+        0.9565999292184134,
+        0.9919144893485324
+      ],
+      "recallInterval": [
+        0.8460477911754535,
+        0.9186701862318688
+      ]
+    },
+    {
+      "id": "high_recall-t70",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.7,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 235,
+      "fp": 1,
+      "tn": 906,
+      "fn": 58,
+      "precision": 0.9957627118644068,
+      "recall": 0.8020477815699659,
+      "falsePositiveRate": 0.0011025358324145535,
+      "precisionInterval": [
+        0.9763928767029163,
+        0.9992516225866709
+      ],
+      "recallInterval": [
+        0.7526427667093717,
+        0.8436351275685846
+      ]
+    },
+    {
+      "id": "high_recall-t75",
+      "modelId": "high_recall",
+      "modelName": "High Recall",
+      "modelVersion": "demo-2",
+      "threshold": 0.75,
+      "inferenceProfile": "high_recall-cpu",
+      "datasetId": "fraud-demo-v2",
+      "datasetSha256": "114f086ace00829572191b867cd0673af6b6d2af170643c34ea4242a382c2d97",
+      "evaluationRunId": "eval-0d7d37f1b0988e97",
+      "evaluationCodeVersion": "2.0.0",
+      "sampleCount": 1200,
+      "evaluatedAt": "2026-11-21T00:00:00Z",
+      "metricProvenance": {
+        "classification": "synthetic-demo",
+        "latency": "synthetic-demo",
+        "cost": "estimated"
+      },
+      "p95LatencyMs": 107.319,
+      "costPer1kUsd": 4.6,
+      "tp": 211,
+      "fp": 1,
+      "tn": 906,
+      "fn": 82,
+      "precision": 0.9952830188679245,
+      "recall": 0.7201365187713311,
+      "falsePositiveRate": 0.0011025358324145535,
+      "precisionInterval": [
+        0.9737694936398178,
+        0.999166851154133
+      ],
+      "recallInterval": [
+        0.6661382547587937,
+        0.7684371597149711
+      ]
+    }
+  ],
+  "evaluationSha256": "fc19783bc692012ae37a8d66f3341d323538eca321d389491ae3b48e023e69c2"
+}

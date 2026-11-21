@@ -1,0 +1,9 @@
+services:
+  nomos:
+    build: .
+    ports:
+      - "127.0.0.1:4173:4173"
+    environment:
+      NOMOS_LLM_API_KEY: ${NOMOS_LLM_API_KEY:-}
+      NOMOS_LLM_MODEL: ${NOMOS_LLM_MODEL:-}
+      NOMOS_LLM_ENDPOINT: ${NOMOS_LLM_ENDPOINT:-}
