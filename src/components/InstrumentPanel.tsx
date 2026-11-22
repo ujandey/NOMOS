@@ -3,7 +3,7 @@ import { MoveVertical } from 'lucide-react';
 import type { Candidate } from '../core/contracts';
 import { capacityReading, prevalenceReading, RATE_STABILITY, SECONDS_BASE, STEADY_STATE, THROUGHPUT_BASE } from '../core/deployment';
 import { AXES, BOTTOM, logFromY, logToY, logistic, logit, PRICE_BASE, reciprocalFromY, reciprocalToY, REQUEST_BASE, TOP, TOTAL_BASE, type Calibration, type LogOddsPlate } from '../core/geometry';
-import { instrumentReading, type InstrumentDomain } from '../core/instruments';
+import { instrumentReading, stepCount, type InstrumentDomain } from '../core/instruments';
 import { dollars, percent } from '../core/display';
 import { AlignmentNomogram, type Scale } from './AlignmentNomogram';
 import { NumberField } from './NumberField';
@@ -66,8 +66,8 @@ function useScales(kind: Plate, top: number, k: number, priorTop: number, priorK
   }, practice), [kind, k, top, priorK, priorTop, ratioTop, practice]);
 }
 
-export function InstrumentPanel({ kind, candidate, prior, setPrior, requests, setRequests, pocket, onEvidence }: {
-  kind: Plate; candidate: Candidate | null; prior: number; setPrior: (v: number) => void; requests: number;
+export function InstrumentPanel({ kind, candidate, prior, priorSource, setPrior, requests, setRequests, pocket, onEvidence }: {
+  kind: Plate; candidate: Candidate | null; prior: number; priorSource: 'target' | 'sample'; setPrior: (v: number) => void; requests: number;
   setRequests: (v: number) => void; pocket: boolean; onEvidence: () => void;
 }) {
   const [practice, setPractice] = useState(false);
@@ -113,7 +113,7 @@ export function InstrumentPanel({ kind, candidate, prior, setPrior, requests, se
     }
   }
 
-  const leftLabel = { prevalence: 'Target prevalence', f1: 'Precision input', cost: 'Requests per day', capacity: 'Throughput' }[kind];
+  const leftLabel = { prevalence: priorSource === 'target' ? 'Target prevalence' : 'Sample prevalence', f1: 'Precision input', cost: 'Requests per day', capacity: 'Throughput' }[kind];
   const rightLabel = { prevalence: 'Likelihood ratio', f1: 'Recall input', cost: 'Unit price', capacity: 'Mean response time' }[kind];
   const outputLabel = { prevalence: 'Expected precision', f1: practice ? 'F1 score' : 'Expected F1', cost: 'Daily inference cost', capacity: 'Average requests in system' }[kind];
   const rightDisplay = kind === 'prevalence' && odds.ratioState === 'unbounded' ? '∞' :
@@ -150,6 +150,7 @@ export function InstrumentPanel({ kind, candidate, prior, setPrior, requests, se
           odds: kind === 'prevalence' ? odds.plate : undefined, capacity: kind === 'capacity' ? capacity.calibration : undefined })}
         onRelease={() => setHeld(null)}
         stepInput={(side, v, direction) => leftField && (side === 0 || rightField) ? v + direction * 0.001
+          : kind === 'cost' && side === 0 ? stepCount(v, direction, maxRequests)
           : v === 0 ? direction > 0 ? scales[side * 2].fromY(TOP) : 0 : v * 10 ** (direction * 0.05)} />
     </div>
     <div className="instrument-notes">
@@ -160,6 +161,7 @@ export function InstrumentPanel({ kind, candidate, prior, setPrior, requests, se
         <p>The finite crossing rounds to a probability endpoint at floating-point precision.</p>}
       {reading.state === 'zero' && <p>Zero boundary. The reading uses an explicit zero convention outside the finite scale.</p>}
       {reading.state === 'missing' && <p>Required inputs are unknown. {kind === 'capacity' ? 'Use practice inputs to operate the plate.' : 'Select a point with evaluation evidence.'}</p>}
+      {kind === 'prevalence' && priorSource === 'sample' && <p>No target prevalence is set, so this plate uses the evaluation sample&rsquo;s prevalence. Moving the handle sets a target.</p>}
       {kind === 'prevalence' && <p><MoveVertical size={16} /> Drag the prevalence handle. {RATE_STABILITY}</p>}
       {kind === 'f1' && <p>{practice ? 'Practice inputs are independent and have no evaluated model attached.' : 'Expected precision feeds this plate from the log-odds instrument. Recall comes from the evaluated point.'}</p>}
       {kind === 'cost' && <p>{practice ? 'Practice volume and price are assumptions. The mission retains its linked inputs.' :

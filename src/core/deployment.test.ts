@@ -64,7 +64,7 @@ test('a tenfold prior change invalidates the demo decision and budget, evidence 
   expect([...evaluateEnvelope(candidates, adapted, 'min_latency').feasibleIds]).toEqual(['balanced-t45']);
   expect(evaluateEnvelope(candidates, adapted, 'min_latency', 2e6).feasibleIds.size).toBe(0);
   const record = exportDecision(manifest, 'balanced-t45', adapted, 'min_latency', 1e6);
-  expect(record).toMatchObject({ schemaVersion: '3.0', feasible: true, deployment: { expectedPrecision: expect.closeTo(0.10118, 4),
+  expect(record).toMatchObject({ schemaVersion: '3.1', pointEstimateFeasible: true, robustlyFeasible: false, deployment: { expectedPrecision: expect.closeTo(0.10118, 4),
     expectedDailyCostUsd: expect.closeTo(3000, 7), capacity: 'unknown' }, instruments: { prevalence: { verification: { passes: true } },
     throughput: { value: null, state: 'missing' }, f1: { verification: { passes: true } }, cost: { verification: { passes: true } } } });
 });

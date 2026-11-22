@@ -7,3 +7,8 @@ services:
       NOMOS_LLM_API_KEY: ${NOMOS_LLM_API_KEY:-}
       NOMOS_LLM_MODEL: ${NOMOS_LLM_MODEL:-}
       NOMOS_LLM_ENDPOINT: ${NOMOS_LLM_ENDPOINT:-}
+      # The container must listen on 0.0.0.0, but the port above is published on host loopback only.
+      # Remove this line, or set NOMOS_PUBLIC_DEMO=1, before publishing the port beyond localhost.
+      NOMOS_LLM_ALLOW_REMOTE: "1"
+      NOMOS_LLM_RATE_PER_MINUTE: ${NOMOS_LLM_RATE_PER_MINUTE:-6}
+      NOMOS_LLM_DAILY_LIMIT: ${NOMOS_LLM_DAILY_LIMIT:-200}

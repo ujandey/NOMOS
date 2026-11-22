@@ -4,6 +4,7 @@ COPY package*.json ./
 RUN npm ci
 COPY index.html vite.config.ts tsconfig.json ./
 COPY src ./src
+COPY public ./public
 COPY server ./server
 COPY data/evaluated.json ./data/evaluated.json
 RUN npm run build

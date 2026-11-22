@@ -1,8 +1,14 @@
 name: NOMOS checks
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   verify:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -11,7 +17,19 @@ jobs:
           cache: npm
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.11.7'
+          python-version: '3.11'
       - run: npm ci
-      - run: npx playwright install chromium
+      - run: npx playwright install --with-deps chromium
+      # Pixel snapshots were recorded on Windows; other platforms run every functional and accessibility assertion.
       - run: npm run check
+      - run: npm run check:static
+  container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t nomos .
+      - run: |
+          docker run -d --name nomos -p 127.0.0.1:4173:4173 nomos
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/ >/dev/null && break; sleep 1; done
+          curl -fsSI http://127.0.0.1:4173/ | grep -i "content-security-policy"
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' http://127.0.0.1:4173/api/mission/parse)" = "503"

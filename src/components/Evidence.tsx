@@ -1,10 +1,10 @@
 import type { Candidate, Manifest, Mission } from '../core/contracts';
 import { deploymentReadings, RATE_STABILITY, STEADY_STATE } from '../core/deployment';
-import { candidateLabel, percent } from '../core/display';
-import type { evaluateEnvelope } from '../core/envelope';
+import { candidateLabel, gateValue, percent } from '../core/display';
+import { resolvePrevalence, STATUS_TEXT, type Envelope } from '../core/envelope';
 import type { Alignment } from '../core/geometry';
 import { Drawer } from './Drawer';
-import { gateValue } from './MissionPanel';
+import { ConfidenceDetails, StatusBadge } from './Confidence';
 
 const exact = (value: number | null) => value === null ? 'Unknown' : Number(value.toPrecision(12)).toString();
 type Proof = {
@@ -37,17 +37,26 @@ export function CalculationProof({ title, formula, reading }: { title: string; f
 }
 
 export function Evidence({ candidate, manifest, mission, requests, envelope, close }: {
-  candidate: Candidate; manifest: Manifest; mission: Mission; requests: number; envelope: ReturnType<typeof evaluateEnvelope>; close: () => void;
+  candidate: Candidate; manifest: Manifest; mission: Mission; requests: number; envelope: Envelope; close: () => void;
 }) {
-  const prior = mission.targetPrevalence ?? 0.1;
+  const resolved = resolvePrevalence(mission, candidate);
+  const prior = resolved.value ?? 0;
   const results = deploymentReadings(candidate, prior, requests);
+  const status = envelope.statuses.get(candidate.id) ?? 'unknown';
+  const checks = envelope.checks.get(candidate.id) ?? [];
   return <Drawer titleId="evidence-title" label="Decision evidence" close={close}>
     <h2 id="evidence-title">{candidateLabel(candidate)}</h2>
     <p>Evaluated scores supply the conditional rates. Deployment prevalence and daily volume supply the scenario. Each inverse scale reads the straightedge crossing, then independent arithmetic checks the result.</p>
+    <section className="proof-section" aria-labelledby="statistical-evidence">
+      <div className="section-line"><h3 id="statistical-evidence">Statistical evidence</h3><StatusBadge status={status} /></div>
+      <p>Point-estimate check: {checks.every(gate => gate.passes) ? 'every limit passes on the measured estimates' : 'one or more limits fail on the measured estimates'}.
+        {' '}Statistical verdict: {STATUS_TEXT[status].toLowerCase()}.</p>
+      <ConfidenceDetails checks={checks} envelope={envelope} candidateId={candidate.id} />
+    </section>
     <div className="evidence-flow">TPR + FPR + prevalence → expected precision → expected F1<br />Daily volume + unit price → daily cost → budget gate</div>
     <p>The middle axis averages the two outer coordinates. Its half slope reads a sum for log and log-odds scales. The reciprocal plate keeps the full slope and reads an average.</p>
     <CalculationProof title="Prevalence-adjusted precision" formula="logit(P) = logit(π) + ln(TPR / FPR)" reading={results.precision} />
-    <p>{percent(prior, 2)} target prevalence · {percent(candidate.recall, 4)} TPR · {percent(candidate.falsePositiveRate, 4)} FPR. {RATE_STABILITY}</p>
+    <p>{percent(prior, 2)} {resolved.source === 'target' ? 'target' : 'sample'} prevalence · {percent(candidate.recall, 4)} TPR · {percent(candidate.falsePositiveRate, 4)} FPR. {RATE_STABILITY}</p>
     <CalculationProof title="Expected F1" formula="1/F₁ = ½ (1/P + 1/R)" reading={results.f1} />
     <CalculationProof title="Daily inference cost (USD)" formula="log(C) = log(N) + log(c)" reading={results.cost} />
     <p>{requests.toLocaleString()} requests/day · {candidate.costPer1kUsd === null ? 'Unknown unit price' : '$' + candidate.costPer1kUsd / 1000 + ' per request'} · {candidate.metricProvenance.cost}.</p>
@@ -55,23 +64,24 @@ export function Evidence({ candidate, manifest, mission, requests, envelope, clo
     <p>{STEADY_STATE} Mean response time is distinct from P95. Maximum sustainable capacity is unknown.</p>
     <section className="proof-section">
       <h3>Constraint checks</h3>
-      <ul>{envelope.checks.get(candidate.id)?.map(check => <li key={check.key}>{check.label} · {gateValue(check.key, check.observed)} {check.passes ? 'meets' : 'misses'} {check.direction === 1 ? 'minimum' : 'maximum'} {gateValue(check.key, check.limit)}</li>)}</ul>
+      <ul>{checks.map(check => <li key={check.key}>{check.label} · {gateValue(check.key, check.observed)} {check.passes ? 'meets' : 'misses'} {check.direction === 1 ? 'minimum' : 'maximum'} {gateValue(check.key, check.limit)} on the estimate{check.statistical ? (check.robust ? '; confirmed at the worst case ' : '; not confirmed at the worst case ') + gateValue(check.key, check.pessimistic) : ''}</li>)}</ul>
     </section>
     <section className="proof-section">
       <h3>Evaluation provenance</h3>
       <dl className="provenance">
+        <dt>Origin</dt><dd>{manifest.origin === 'browser-import' ? 'Imported in this browser · not uploaded' : 'Bundled synthetic fixture'}</dd>
+        {manifest.source && <><dt>Source file</dt><dd>{manifest.source.fileName} · {manifest.source.bytes.toLocaleString()} bytes · label “{manifest.source.columns.label}”, score “{manifest.source.columns.score}”</dd></>}
         <dt>Dataset</dt><dd>{candidate.datasetId} · {candidate.sampleCount.toLocaleString()} rows</dd>
         <dt>Classification</dt><dd>{candidate.metricProvenance.classification} · TP {candidate.tp}, FP {candidate.fp}, TN {candidate.tn}, FN {candidate.fn}</dd>
-        <dt>Source precision</dt><dd>{percent(candidate.precision, 4)} {candidate.precisionInterval && ' · 95% Wilson interval ' + candidate.precisionInterval.map(v => percent(v, 2)).join('–')}</dd>
-        <dt>Recall interval</dt><dd>{candidate.recallInterval?.map(v => percent(v, 2)).join('–') ?? 'Unavailable'}</dd>
+        <dt>Sample precision</dt><dd>{percent(candidate.precision, 4)} at the evaluation&rsquo;s own prevalence{candidate.precisionInterval && ' · fixture 95% Wilson interval ' + candidate.precisionInterval.map(v => percent(v, 2)).join('–') + ' (individual, unadjusted)'}</dd>
         <dt>Timing</dt><dd>{candidate.metricProvenance.latency} · {manifest.benchmarkMethod}</dd>
         <dt>Performance inputs</dt><dd>{candidate.performance ? candidate.performance.provenance + ' · ' + candidate.performance.method : 'Mean response time and measured throughput unavailable'}</dd>
         <dt>Pricing</dt><dd>{manifest.costMethod}</dd>
         <dt>Run · profile</dt><dd>{candidate.evaluationRunId} · {candidate.inferenceProfile}</dd>
         <dt>Dataset SHA-256</dt><dd><code>{candidate.datasetSha256}</code></dd>
         <dt>Evaluation SHA-256</dt><dd><code>{manifest.evaluationSha256}</code></dd>
-        <dt>Benchmark SHA-256</dt><dd><code>{manifest.benchmarkSha256}</code></dd>
-        <dt>Evaluator SHA-256</dt><dd><code>{manifest.evaluationSourceSha256}</code></dd>
+        <dt>Benchmark SHA-256</dt><dd>{manifest.benchmarkSha256 ? <code>{manifest.benchmarkSha256}</code> : 'Not provided'}</dd>
+        <dt>Evaluator SHA-256</dt><dd>{manifest.evaluationSourceSha256 ? <code>{manifest.evaluationSourceSha256}</code> : 'Browser evaluator · nomos-browser-3.1.0'}</dd>
       </dl>
     </section>
   </Drawer>;

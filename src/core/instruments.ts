@@ -46,7 +46,21 @@ export function instrumentReading(kind: Instrument, left: number | null, right: 
   const error = kind === 'cost' ? absoluteError / Math.abs(referenceValue) : absoluteError;
   const verification = {
     referenceValue, absoluteError, error, tolerance: TOLERANCE,
-    criterion: kind === 'f1' ? 'absolute' : 'relative', passes: error < TOLERANCE, residual: collinearityResidual(alignment),
+    criterion: kind === 'f1' ? 'absolute' : 'relative', passes: error <= TOLERANCE, residual: collinearityResidual(alignment),
   };
   return { alignment, value, verification, state: 'aligned', ...domain } as const;
+}
+
+/**
+ * Keyboard step for an integer quantity on a logarithmic scale. A pure ×10^0.05 step rounds back to the
+ * same integer below about 9, which used to trap the marker. Each press now moves at least one unit.
+ */
+export function stepCount(value: number, direction: number, maximum = Infinity) {
+  const sign = Math.sign(direction);
+  if (!sign) return value;
+  const current = Math.max(0, Math.round(value));
+  if (current === 0) return sign > 0 ? Math.min(maximum, 1) : 0;
+  const scaled = Math.round(current * 10 ** (sign * 0.05));
+  const next = scaled === current ? current + sign : scaled;
+  return Math.min(maximum, Math.max(0, next));
 }

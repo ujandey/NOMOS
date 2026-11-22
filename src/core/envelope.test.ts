@@ -2,7 +2,9 @@ import fc from 'fast-check';
 import { expect, test } from 'vitest';
 import { DEFAULT_MISSION } from './contracts';
 import { candidates } from './demo';
-import { checkConstraints, dominates, EPSILON, evaluateEnvelope, paretoFrontier, resolveSelection } from './envelope';
+import { checkConstraints, dominates, evaluateEnvelope, paretoFrontier, resolveSelection } from './envelope';
+
+const EPSILON = 1e-9;
 
 test('near-equal trade-offs cannot cycle and remove the entire Pareto frontier', () => {
   const offset = EPSILON * 0.75;
@@ -70,8 +72,8 @@ test('constraint monotonicity, comparable Pareto soundness and order invariance'
         expect(point.costPer1kUsd).not.toBeNull();
         expect(point.precision!).toBeGreaterThanOrEqual(mission.minPrecision - 1e-9);
         expect(point.recall!).toBeGreaterThanOrEqual(mission.minRecall - 1e-9);
-        expect(point.p95LatencyMs!).toBeLessThanOrEqual(mission.maxP95LatencyMs + 1e-9);
-        expect(point.costPer1kUsd!).toBeLessThanOrEqual(mission.maxCostPer1kUsd + 1e-9);
+        expect(point.p95LatencyMs!).toBeLessThanOrEqual(mission.maxP95LatencyMs! + 1e-9);
+        expect(point.costPer1kUsd!).toBeLessThanOrEqual(mission.maxCostPer1kUsd! + 1e-9);
       }
       if (baseline.globalParetoIds.has(point.id)) expect(points.some(other => dominates(other, point))).toBe(false);
     }

@@ -1,27 +1,42 @@
 import { useRef, useState, type PointerEvent } from 'react';
 import type { Candidate, Mission } from '../core/contracts';
-import type { evaluateEnvelope } from '../core/envelope';
+import { STATUS_TEXT, type Envelope as EnvelopeResult } from '../core/envelope';
 import { candidateLabel, percent } from '../core/display';
 
 type Limit = 'minRecall' | 'minPrecision' | 'maxFalsePositiveRate';
 type Props = {
-  candidates: Candidate[]; selected: Candidate | null; mission: Mission; envelope: ReturnType<typeof evaluateEnvelope>;
+  candidates: Candidate[]; selected: Candidate | null; mission: Mission; envelope: EnvelopeResult;
   select: (id: string) => void; setLimit: (key: Limit, value: number) => void; zoom: boolean; pocket: boolean;
+  /** Resolved prevalence (target or sample) used for the precision boundary. */
+  prior: number | null;
 };
 
-export function Envelope({ candidates, selected, mission, envelope, select, setLimit, zoom, pocket }: Props) {
+/**
+ * Keyboard steps follow the handle's on-screen motion. Raising the minimum precision moves the
+ * precision boundary left, so ArrowLeft raises it and ArrowRight lowers it. ArrowUp always raises
+ * the limit's value and ArrowDown always lowers it.
+ */
+export function keyDirection(key: Limit, pressed: string) {
+  if (pressed === 'ArrowUp') return 1;
+  if (pressed === 'ArrowDown') return -1;
+  const visual = pressed === 'ArrowRight' ? 1 : pressed === 'ArrowLeft' ? -1 : 0;
+  return key === 'minPrecision' ? -visual : visual;
+}
+
+export function Envelope({ candidates, selected, mission, envelope, select, setLimit, zoom, pocket, prior: resolvedPrior }: Props) {
   const svg = useRef<SVGSVGElement>(null);
   const drag = useRef<{ id: number; target: Limit | 'candidate'; offset: number } | null>(null);
-  const [feasibleOnly, setFeasibleOnly] = useState(false);
+  const [passingOnly, setPassingOnly] = useState(false);
+  const [allRanges, setAllRanges] = useState(false);
   const width = pocket ? 400 : 860, height = pocket ? 315 : 368;
   const left = pocket ? 49 : 70, right = width - (pocket ? 16 : 34), top = 21, bottom = height - 53;
   const maxX = zoom ? 0.2 : Math.min(1, Math.max(0.5, ...candidates.map(c => c.falsePositiveRate ?? 0)));
   const minY = zoom ? 0.78 : Math.max(0, Math.min(0.25, ...candidates.map(c => c.recall ?? 1)));
-  const projectX = (v: number) => left + (right - left) * Math.sqrt(v / maxX);
-  const projectY = (v: number) => top + (bottom - top) * (1 - v) / (1 - minY);
+  const projectX = (v: number) => left + (right - left) * Math.sqrt(Math.min(maxX, Math.max(0, v)) / maxX);
+  const projectY = (v: number) => top + (bottom - top) * (1 - Math.max(minY, Math.min(1, v))) / (1 - minY);
   const readX = (x: number) => maxX * Math.min(1, Math.max(0, (x - left) / (right - left))) ** 2;
   const readY = (y: number) => 1 - (1 - minY) * Math.min(1, Math.max(0, (y - top) / (bottom - top)));
-  const prior = mission.targetPrevalence ?? 0;
+  const prior = resolvedPrior ?? 0;
   const fpr = mission.maxFalsePositiveRate ?? 1;
   const recallLine = projectY(Math.max(minY, mission.minRecall));
   const fprLine = projectX(Math.min(maxX, fpr));
@@ -35,12 +50,20 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
   }).join(' ');
   const precisionHandleY = projectY(0.91);
   const precisionHandleX = projectX(Math.min(maxX, precisionX(0.91)));
+  const status = (c: Candidate) => envelope.statuses.get(c.id) ?? 'unknown';
+  const passing = (c: Candidate) => ['robust', 'estimate-only'].includes(status(c));
   const points = candidates.flatMap(c => c.recall === null || c.falsePositiveRate === null || c.recall < minY || c.falsePositiveRate > maxX ||
-    (feasibleOnly && !envelope.feasibleIds.has(c.id)) ? [] :
-    [{ c, x: projectX(c.falsePositiveRate), y: projectY(c.recall) }]);
+    (passingOnly && !passing(c)) ? [] : [{ c, x: projectX(c.falsePositiveRate), y: projectY(c.recall) }]);
   const visibleSelection = points.some(point => point.c.id === selected?.id);
   const yTicks = zoom ? [0.8, 0.85, 0.9, 0.95, 1] : [minY, 0.4, 0.6, 0.8, 1].filter(v => v >= minY);
   const xTicks = zoom ? [0, 0.005, 0.02, 0.05, 0.1, 0.2] : [0, 0.01, 0.05, 0.1, 0.25, maxX];
+  const box = (c: Candidate) => {
+    const evidence = envelope.values.get(c.id)?.evidence;
+    if (!evidence?.tpr || !evidence.fpr) return null;
+    return { x1: projectX(evidence.fpr.lower), x2: projectX(evidence.fpr.upper), y1: projectY(evidence.tpr.upper), y2: projectY(evidence.tpr.lower),
+      clipped: evidence.fpr.upper > maxX || evidence.tpr.lower < minY, worst: { fpr: evidence.fpr.upper, tpr: evidence.tpr.lower } };
+  };
+  const selectedBox = selected && visibleSelection ? box(selected) : null;
 
   function position(event: PointerEvent) {
     const matrix = svg.current?.getScreenCTM();
@@ -85,7 +108,7 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
         begin(event, key, key === 'minRecall' ? y : x);
       }}
       onKeyDown={event => {
-        const direction = ['ArrowUp', 'ArrowRight'].includes(event.key) ? 1 : ['ArrowDown', 'ArrowLeft'].includes(event.key) ? -1 : 0;
+        const direction = keyDirection(key, event.key);
         if (!direction && !['Home', 'End'].includes(event.key)) return;
         event.preventDefault();
         const next = direction ? value + direction * (event.shiftKey ? 0.01 : 0.001) : event.key === 'Home' ? 0 : 1;
@@ -105,7 +128,7 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
         onPointerUp={event => { if (drag.current?.id === event.pointerId) stop(); }}
         onPointerCancel={event => { if (drag.current?.id === event.pointerId) stop(); }}
         onLostPointerCapture={event => { if (drag.current?.id === event.pointerId) stop(); }}>
-        <title>Evaluated operating points and quality constraints</title>
+        <title>Evaluated operating points, their uncertainty and quality constraints</title>
         <rect x={left} y={top} width={right - left} height={bottom - top} className="plot-field" />
         <polygon className="quality-region" points={`${left},${recallLine} ${curve(Math.max(minY, mission.minRecall), 1, Math.min(maxX, fpr))} ${left},${top}`} />
         {xTicks.map(tick => <g key={tick}>
@@ -122,10 +145,22 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
         {mission.minRecall >= minY && <line className="constraint-line recall-boundary" x1={left} x2={right} y1={recallLine} y2={recallLine} />}
         {mission.maxFalsePositiveRate !== undefined && fpr <= maxX && <line className="constraint-line fpr-boundary" x1={fprLine} x2={fprLine} y1={top} y2={bottom} />}
         {prior > 0 && prior < 1 && mission.minPrecision > 0 && <polyline className="constraint-line precision-boundary" points={curve(minY, 1, maxX)} />}
+        {allRanges && <g aria-hidden="true">{points.filter(p => p.c.id !== selected?.id).map(({ c }) => {
+          const b = box(c);
+          return b && <rect key={c.id} className={'uncertainty-box faint status-' + status(c)} x={b.x1} y={b.y1} width={Math.max(1, b.x2 - b.x1)} height={Math.max(1, b.y2 - b.y1)} />;
+        })}</g>}
+        {selectedBox && <g aria-hidden="true" data-testid="selected-uncertainty">
+          <rect className={'uncertainty-box status-' + status(selected!)} x={selectedBox.x1} y={selectedBox.y1}
+            width={Math.max(1, selectedBox.x2 - selectedBox.x1)} height={Math.max(1, selectedBox.y2 - selectedBox.y1)} />
+          <line className="worst-link" x1={projectX(selected!.falsePositiveRate!)} y1={projectY(selected!.recall!)} x2={selectedBox.x2} y2={selectedBox.y2} />
+          <path className="worst-mark" d={`M${selectedBox.x2 - 5} ${selectedBox.y2 - 5}l10 10m0-10l-10 10`} />
+          <text className="worst-text" x={Math.min(selectedBox.x2 + 8, right - 4)} y={Math.min(selectedBox.y2 + 16, bottom - 4)}
+            textAnchor={selectedBox.x2 + 90 > right ? 'end' : 'start'}>WORST CASE{selectedBox.clipped ? ' (OFF SCALE)' : ''}</text>
+        </g>}
         {points.map(({ c, x, y }) => {
-          const isSelected = c.id === selected?.id, passes = envelope.feasibleIds.has(c.id);
-          return <g key={c.id} transform={`translate(${x} ${y})`} className={`sample ${passes ? 'feasible' : 'outside'} ${isSelected ? 'selected' : ''}`}
-            role="button" tabIndex={0} aria-pressed={isSelected} aria-label={candidateLabel(c) + (passes ? ', feasible' : ', outside mission')}
+          const isSelected = c.id === selected?.id, state = status(c);
+          return <g key={c.id} transform={`translate(${x} ${y})`} className={`sample status-${state} ${isSelected ? 'selected' : ''}`}
+            role="button" tabIndex={0} aria-pressed={isSelected} aria-label={candidateLabel(c) + ', ' + STATUS_TEXT[state].toLowerCase()}
             onPointerDown={event => { begin(event, 'candidate', 0); if (event.button === 0) select(c.id); }}
             onKeyDown={event => {
               if (event.key === ' ' || event.key === 'Enter') { event.preventDefault(); select(c.id); }
@@ -135,10 +170,11 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
                 const next = series[series.findIndex(p => p.c.id === c.id) + (event.key === 'ArrowRight' ? 1 : -1)];
                 if (next) { select(next.c.id); svg.current?.querySelector<SVGElement>(`[data-point="${CSS.escape(next.c.id)}"]`)?.focus(); }
               }
-            }} data-point={c.id}>
-            <title>{candidateLabel(c)} · {percent(c.recall)} recall · {percent(c.falsePositiveRate)} false positives</title>
+            }} data-point={c.id} data-status={state}>
+            <title>{candidateLabel(c)} · {STATUS_TEXT[state]} · {percent(c.recall)} recall · {percent(c.falsePositiveRate)} false positives</title>
             <circle r={12} fill="transparent" />
             {isSelected && <><circle r={11} className="crosshair" /><path className="crosshair" d="M-17 0h5m24 0h5M0-17v5m0 24v5" /></>}
+            {state === 'estimate-only' && <circle r={8} className="doubt-ring" />}
             {envelope.feasibleParetoIds.has(c.id) ? <path className="point-mark" d="M0-6 6 0 0 6-6 0Z" /> : <circle r="4.5" className="point-mark" />}
           </g>;
         })}
@@ -148,10 +184,22 @@ export function Envelope({ candidates, selected, mission, envelope, select, setL
       </svg>
     </div>
     <div className="map-caption">
-      <div className="legend"><span><i className="legend-area" />Quality limits</span><span><i className="legend-point" />Outside mission</span><span><i className="legend-pareto" />Feasible Pareto</span></div>
-      <label><input type="checkbox" checked={feasibleOnly} onChange={event => setFeasibleOnly(event.target.checked)} /> Feasible only</label>
+      <div className="legend">
+        <span><i className="legend-area" />Quality limits</span>
+        <span><i className="legend-dot status-robust" />Robust</span>
+        <span><i className="legend-dot status-estimate-only" />Estimate only</span>
+        <span><i className="legend-dot status-uncertain" />Could pass</span>
+        <span><i className="legend-dot status-infeasible" />Fails</span>
+        <span><i className="legend-dot status-unknown" />No evidence</span>
+      </div>
+      <div className="map-toggles">
+        <label><input type="checkbox" checked={allRanges} onChange={event => setAllRanges(event.target.checked)} /> All ranges</label>
+        <label><input type="checkbox" checked={passingOnly} onChange={event => setPassingOnly(event.target.checked)} /> Passing only</label>
+      </div>
     </div>
-    <p className="map-hint">Drag a boundary handle to change a quality limit. Point markers also reflect latency, budget and any throughput requirement.</p>
+    <p className="map-hint">The box around the selected point shows where its true recall and false-positive rate plausibly lie
+      ({percent(envelope.statistics.confidence, 0)} simultaneous). A point is robustly feasible only when its whole box, including the
+      worst-case corner, stays inside the shaded region and every other limit is met. Diamonds mark the Pareto front among estimate passes.</p>
     {!visibleSelection && selected && <p className="instrument-note">The selected point is outside this view. Its mission check remains active.</p>}
   </div>;
 }
